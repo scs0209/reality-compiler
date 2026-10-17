@@ -1,0 +1,32 @@
+name: Reality Compiler CI & RoomGraph Schema Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify-compiler:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck RoomGraph v1.2 & Spatial Engine
+        run: npm run typecheck
+
+      - name: Run Epistemic Uncertainty & What-If Unit Tests
+        run: npm test
+
+      - name: Build Production Bundle for DigitalOcean
+        run: npm run build

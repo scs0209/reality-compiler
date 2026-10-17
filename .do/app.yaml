@@ -1,0 +1,35 @@
+name: reality-compiler
+region: nyc
+domains:
+  - domain: realitycompiler.tech
+    type: PRIMARY
+  - domain: www.realitycompiler.tech
+    type: ALIAS
+services:
+  - name: compiler-web-api
+    environment_slug: node-js
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-2gb
+    http_port: 8787
+    build_command: npm ci && npm run build
+    run_command: npm run start
+    routes:
+      - path: /
+    envs:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "8787"
+      - key: PUBLIC_TECH_DOMAIN
+        value: "https://realitycompiler.tech"
+      - key: GEMMA_MODEL
+        value: "gemma3:4b"
+      - key: OLLAMA_BASE_URL
+        scope: RUN_TIME
+        value: "${GPU_DROPLET_OLLAMA_URL}"
+      - key: MONGODB_URI
+        scope: RUN_TIME
+        type: SECRET
+      - key: SENTRY_DSN
+        scope: RUN_TIME
+        type: SECRET

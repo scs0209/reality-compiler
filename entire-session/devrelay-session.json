@@ -1,0 +1,34 @@
+{
+  "sessionFormat": "entire.devrelay.v1",
+  "sessionId": "ses_rc_hacktoberfest_w2_20261017",
+  "project": "Reality Compiler (realitycompiler.tech)",
+  "challenge": "Hacktoberfest Open-Source AI Challenge: Week 2 (Side Hustle)",
+  "createdAt": "2026-10-17T08:15:00Z",
+  "agent": "Freebuff / Codebuff + GitHub Copilot",
+  "modelRuntime": "gemma3:4b (Ollama / DigitalOcean GPU)",
+  "whyThisSchemaAndPrompt": {
+    "problem": "Single-image 3D room reconstruction tools generate visually smooth meshes that silently hallucinate occluded corners. Movers and studio tenants cannot trust a pretty 3D mesh to answer whether a 154cm Queen bed and a 140cm desk leave room for a mini-fridge or pass through a 76cm hallway door.",
+    "solution": "We designed RoomGraph v1.2 (`shared/roomGraphSchema.ts`) around epistemic honesty: every extracted object carries `epistemic: observed | inferred | occluded_prior` and explicit metric error bars (`posPlusMinusCm`, `dimPlusMinusCm`).",
+    "promptDecision": "Instead of asking Gemma 3 (`gemma3:4b`) to guess raw centimetre coordinates in a vacuum, our multi-stage compiler (`server/gemmaCompiler.ts`) forces Step 1 (`vision.calibrate`) to lock onto a standardized architectural fixture (e.g., KS standard door frame 210x82cm) before computing bounding footprints and uncertainty bands."
+  },
+  "checkpoints": [
+    {
+      "id": "cp-01-schema",
+      "title": "Designing RoomGraph v1.2 with Epistemic Status & Uncertainty Bands",
+      "files": ["shared/roomGraphSchema.ts"],
+      "decision": "Separated `observed` (direct floor-corner visibility), `inferred` (partial occlusion + standard furniture priors), and `occluded_prior` (blind-spot inference) so downstream tools can compute both Nominal and Worst-Case feasibility."
+    },
+    {
+      "id": "cp-02-gemma-sentry",
+      "title": "Gemma 3 Vision Compiler + Sentry Agent Tracing Spans",
+      "files": ["server/gemmaCompiler.ts", "server/sentryAgentTracer.ts"],
+      "decision": "Instrumented `vision.calibrate`, `ai.run.gemma3`, `compiler.uncertainty_solver`, and `db.mongodb.upsert` with token usage and latency waterfall tracking."
+    },
+    {
+      "id": "cp-03-whatif-solver",
+      "title": "Downstream #1: Moving What-If & TabPFN Cost Quantile Verifier",
+      "files": ["shared/spatialEngine.ts", "src/components/WhatIfSimulatorPanel.tsx"],
+      "decision": "Built a 2-tier geometric constraint solver: flags `UNCERTAINTY_OVERFLOW` when two items pass under nominal dimensions (e.g. 2cm gap) but collide under `±8cm` epistemic uncertainty, telling the user the exact single measurement to verify with a tape measure."
+    }
+  ]
+}
