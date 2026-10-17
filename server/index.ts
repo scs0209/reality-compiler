@@ -1,4 +1,5 @@
 import express from 'express';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -21,6 +22,22 @@ import { evaluateMovingWhatIf } from '../shared/spatialEngine';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Local development: read a git-ignored .env from the repo root. Variables that are already set in
+// the real environment (for example on DigitalOcean) win over the file.
+const envFile = path.resolve(__dirname, '../.env');
+if (existsSync(envFile)) {
+  if (typeof process.loadEnvFile !== 'function') {
+    console.warn('[env] .env found, but this Node version cannot load it (needs 20.12+). Set variables in the shell instead.');
+  } else {
+    try {
+      process.loadEnvFile(envFile);
+      console.log('[env] loaded .env');
+    } catch (err) {
+      console.error(`[env] could not read .env: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+}
 
 initSentryAgentTracing();
 

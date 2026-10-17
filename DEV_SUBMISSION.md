@@ -7,10 +7,13 @@ tags: devchallenge, hf26challenge, ai, opensource
 <!--
 BEFORE YOU PUBLISH. This comment is not rendered on DEV; delete it when you are done.
 
-Not verified yet, so the post does not claim any of it:
-1. Code link: the repo has no git remote yet. Push it and add the URL under "Code".
-   The repo now has an MIT LICENSE (copyright scs0209). Push only the feature branch: a local entire/* branch
-   created by Entire also contains HANDOFF.md.
+Open items. The post does not claim anything that is still unverified:
+1. Code link: done. The repo is public at https://github.com/scs0209/reality-compiler (MIT) and the link is
+   under "Code". Two things to decide before you publish: the default branch is still feat/real-gemma-sentry-tracing
+   while main holds the first commit, so visitors land on the feature branch; and the history still contains the
+   earlier prototype, whose canned telemetry and TabPFN labels were removed in the later commits. Pushes also run
+   Entire's pre-push hook, which uploads session logs, so skip hooks (git push with the no-verify flag) unless you
+   mean to share them, and keep HANDOFF.md out of anything you push (a local entire/* branch contains it).
 2. Live demo: nothing is deployed that I could check. Add a URL only after opening it yourself.
    Add screenshots or a short video of real runs under "Demo".
 3. Real photos: every successful run so far used a diagram image, not a photograph. Run 3 to 5 real room
@@ -78,6 +81,8 @@ Then open the Vite URL it prints (`http://127.0.0.1:5173` by default), upload a 
 If Gemma can't produce a usable answer, the app does not pretend. It shows a bundled sample room under an amber banner that says it is **not your photo** and why, and it does not save that result automatically. The three rooms in the sidebar are hand-authored samples, labelled as such; loading one does not call a model.
 
 ## Code
+
+Repository: [github.com/scs0209/reality-compiler](https://github.com/scs0209/reality-compiler)
 
 Stack: TypeScript, React, Vite, Tailwind, Express, Zod, Vitest, Ollama. The code is MIT-licensed; Gemma is not part of the repo and stays under Google's Gemma Terms of Use.
 

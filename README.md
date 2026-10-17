@@ -52,6 +52,8 @@ npm run dev
 - Compiler API Health: `http://127.0.0.1:8787/api/health`
 - Verification: `npm run typecheck && npm test && npm run build`
 
+Optional settings (a Sentry DSN, MongoDB Atlas, a remote Ollama) go in a git-ignored `.env`. Copy [.env.example](.env.example) to `.env`, fill in what you use, and restart the dev server. Variables already set in the real environment override the file.
+
 ## License
 
 The code in this repository is released under the [MIT License](LICENSE). Third-party dependencies keep their own licenses.
