@@ -16,17 +16,27 @@ Open items. The post does not claim anything that is still unverified:
    mean to share them, and keep HANDOFF.md out of anything you push (a local entire/* branch contains it).
 2. Live demo: nothing is deployed that I could check. Add a URL only after opening it yourself.
    Add screenshots or a short video of real runs under "Demo".
-3. Real photos: every successful run so far used a diagram image, not a photograph. Run 3 to 5 real room
-   photos, then add what you saw to "Demo" and update "Limitations".
+3. Real photos: five room images went through the app's pipeline with two models (see "Which Gemma?"). Four are
+   CC0 files from Wikimedia Commons and are credited in the post. The fifth is a bedroom photo you downloaded
+   (images.jpeg) whose source and licence I do not know: do not show it, or screenshots of its result, in the post
+   or the video. Use a photo you own or can license instead. Still to add: screenshots or a short video of real
+   runs under "Demo".
 4. Prize categories: only Gemma is enabled. The READY-TO-ENABLE blocks at the bottom each say what must be true first.
 5. Agent session: none is shared yet. entire-session/devrelay-session.json is not an export from Entire or DevRelay
-   and its content is out of date, so do not link it. Add "My Agent Session" with a real link.
-6. Sentry: traces were checked only against a local stand-in for Sentry's ingest endpoint. Set a real SENTRY_DSN,
-   run a few compiles, and look at the trace in Sentry (including its AI Agents view) before claiming anything.
-7. MongoDB Atlas: implemented but never connected to a real cluster.
+   and its content is out of date, so do not link it. Save this session with DevRelay and add "My Agent Session"
+   with the real link or embed; the placeholder sits under "Why Does Open Innovation Matter?".
+6. Sentry: with a real SENTRY_DSN, Sentry accepted a compile's transaction (HTTP 200, no failures). Still open the
+   trace in Sentry itself (including its AI Agents view) and take the screenshots the Sentry category asks for.
+7. MongoDB Atlas: connected to a real cluster, and a compile was stored there. Take a screenshot of the collection
+   for the post. Note that stored documents include the source photo.
 8. Rules from the challenge page: submissions close 2026-10-18 11:59 PM PDT (2026-10-19 15:59 KST);
    non-English posts are not eligible for prizes; the page header also showed a "Live / Ended" status, so
    confirm the challenge is still open.
+9. Comparison figure: docs/post-images/model-comparison.jpg (credits in docs/post-images/CREDITS.md). The post
+   links it through raw.githubusercontent.com on the feature branch, so the image shows up only after you commit and
+   push it, and it breaks if the branch is renamed or deleted. After pushing, either pin the URL to a commit SHA, or
+   drag the file into the DEV editor to host it there and replace the URL. Do not add the bedroom photo (unknown
+   licence) to the repo or the post.
 -->
 
 *This is a submission for the [Hacktoberfest Open-Source AI Challenge: Week 2 (Side Hustle)](https://dev.to/challenges/hacktoberfest-week2-2026-10-12).*
@@ -76,7 +86,7 @@ ollama pull gemma3:4b
 npm run dev
 ```
 
-Then open the Vite URL it prints (`http://127.0.0.1:5173` by default), upload a PNG, JPEG or WebP, set the reference object (a 210 cm door frame by default) and wait. On my Mac a compile takes about 50 seconds, and about 90 seconds when Gemma's first answer is rejected and it gets a second try.
+Then open the Vite URL it prints (`http://127.0.0.1:5173` by default), upload a PNG, JPEG or WebP, set the reference object (a 210 cm door frame by default) and wait. On my Mac a compile takes 40 to 50 seconds, and 90 to 110 seconds when Gemma's first answer is rejected and it gets a second try.
 
 If Gemma can't produce a usable answer, the app does not pretend. It shows a bundled sample room under an amber banner that says it is **not your photo** and why, and it does not save that result automatically. The three rooms in the sidebar are hand-authored samples, labelled as such; loading one does not call a model.
 
@@ -91,7 +101,7 @@ Stack: TypeScript, React, Vite, Tailwind, Three.js, Express, Zod, Vitest, Ollama
 - `server/gemmaScene.ts`: the prompt, the JSON Schema given to Ollama, validation of Gemma's answer, and edge derivation.
 - `shared/spatialEngine.ts`: the what-if checks and the quote formula.
 - `server/sentryAgentTracer.ts`: tracing (optional, see below).
-- `tests/`: 22 tests. Ollama is mocked, and Sentry's outgoing envelopes are intercepted to check what would be sent.
+- `tests/`: 33 tests. Ollama is mocked, and Sentry's outgoing envelopes are intercepted to check what would be sent.
 
 ## How I Built It
 
@@ -107,6 +117,28 @@ Stack: TypeScript, React, Vite, Tailwind, Three.js, Express, Zod, Vitest, Ollama
 
 - *Photo boxes.* First Gemma copied the footprint's centimetre values into the box field, so every box had zero area. I fixed the wording, but on a real room photo the boxes then landed in the top-left corner of the photo, or on the wrong object (the bed's box over the window, a chair's box over a shelf), whether I asked for 0 to 1000 or for pixels. That was one photo, not a benchmark, but it was enough: the model is no longer asked for boxes. Compiled rooms have none, the UI says so, and only the hand-authored samples draw boxes on their photo.
 - *Placement.* Gemma also places objects outside the room it just described, even when told not to. On that same photo it put a 280 cm bed 300 cm from the west wall of a 360 cm room. I couldn't prompt that away, so the code moves such an object back inside, marks it `inferred` with a wider ± band, and writes the move into its reason. Its position is a guess, not a reading. The number of moved objects is recorded in the trace.
+- *A range check that doubled the run time.* `gemma3:4b` writes the ceiling height in millimetres: 2700 and 2400 for 270 cm and 240 cm ceilings. My validation rejected anything above 600 cm, so two of my five test photos were thrown away and asked again, taking 107.8 s and 90.6 s instead of about 45. The ceiling height only sets the wall height in the views, so it is now corrected instead of rejected: 1800 to 6000 is read as millimetres, any other value outside 180 to 600 cm is clamped, and each correction is recorded in the trace (`gemma.ceiling_height_adjusted`). The same two photos now pass on the first attempt, in 46.2 s and 40.0 s. Room width and depth keep their strict checks, because a "corrected" room size would just be a wrong one.
+
+**Which Gemma?** The newer Gemma 4 exists, and `gemma4:e4b` (6.6 GB in Ollama, shipped with an Apache 2.0 licence file) fits on my 16 GB Mac, so I ran the same five room images through both models: same prompt, same schema, temperature 0, one run each.
+
+| | `gemma3:4b` | `gemma4:e4b` |
+|---|---|---|
+| Time per photo | 40 to 51 s | 107 to 120 s |
+| Output tokens per attempt | 1.2k to 1.4k | 2.4k to 2.9k |
+| Photos that ended in a usable RoomGraph | 5 of 5 | 4 of 5 |
+| Objects the model placed outside the room | 4 of 28 | 2 of 20 |
+
+On the four photos where both finished, that last row is 3 of 22 against 2 of 20. Gemma 4 failed on the busiest room (a dining area with a shelving unit): both attempts ran into the 3,500-token output limit, so the app showed its sample room after 285 seconds.
+
+![Four room images from Wikimedia Commons, each with the floor objects gemma3:4b and gemma4:e4b listed for it, plus time and the number of objects placed outside the room](https://raw.githubusercontent.com/scs0209/reality-compiler/feat/real-gemma-sentry-tracing/docs/post-images/model-comparison.jpg)
+
+The figure shows the four images I can show, with what each model listed. The fifth, a bedroom photo, is in the table above but not in the figure (see below).
+
+What I saw, judged by eye: Gemma 4 was better on a living room (sofa, armchair, TV console and three plants, missing only the floor lamp) and slightly cleaner on a 3D render. Gemma 3 was better on a bedroom (bed, chair, shelf, plant and stool, where Gemma 4 gave bed, nightstand, drawers and chair). Both found the bed, desk, chair and wardrobe in a dorm room. Both make mistakes: Gemma 3 called a cat a dog and listed a TV and a candle as floor objects; Gemma 4 returned Korean labels for one photo and `snake_case` names for another although the prompt asks for English names.
+
+My reading: Gemma 4 E4B put fewer objects outside the room, but not by enough to matter in five photos, and it was about 2.4 times slower and less reliable on a busy room. The app keeps `gemma3:4b` as its default. I did not tune the prompt or raise the output limit for Gemma 4, so this compares one setup, not the models.
+
+The limits of this test: five images, one run each, no labelled ground truth, so "right" and "wrong" are my own reading of each picture. One image is a 3D render, not a photograph, and a difference of one or two objects is noise at this size. It is not a benchmark. The bedroom photo is one I found online without recording its source or licence, so I don't show it here. The other four are CC0 files from Wikimedia Commons, credited here and in the figure although CC0 does not require it: "Single dorm room, UVA.jpg", "Living room (Unsplash).jpg", "The living room that needs houseplants.jpg", and "Living Room Interior Designer - Picker Online.jpg" (the 3D render). Authors and source pages are in `docs/post-images/CREDITS.md`.
 
 **Optional integrations.** With `SENTRY_DSN` set, each compile is sent to Sentry as a `gen_ai.invoke_agent` trace: one span for the preflight check, one for each Gemma request (with Ollama's real input and output token counts), one for validation and one for the save. Photos, file names and prompt text are never attached. Without a DSN nothing is sent, and the header and `/api/health` say "not sending". With `MONGODB_URI` set, compiled RoomGraphs are stored in MongoDB Atlas; note that this includes the source photo, so it is an explicit opt-in.
 
@@ -114,12 +146,28 @@ Stack: TypeScript, React, Vite, Tailwind, Three.js, Express, Zod, Vitest, Ollama
 
 - **Photos of your home are private.** With `gemma3:4b` running locally through Ollama, the photo stays on your machine. That changes if you point the app at a remote Ollama or turn on Atlas storage, and both are your choice.
 - **Open weights let the whole pipeline run on one machine.** A pinned model, schema-constrained decoding and no network dependency make "validate it, retry once, show the failure" cheap enough to do on every photo.
-- **The trade-off is speed.** There is no per-photo API bill, but a compile takes about a minute on my Mac. That suits "check before moving day", not interactive editing.
-- **Be precise about "open".** Gemma is open-weight under Google's own terms, not open source in the OSI sense. The model name is a config value (`GEMMA_MODEL`), but I have only tested `gemma3:4b`.
+- **The trade-off is speed.** There is no per-photo API bill, but a compile takes 40 to 50 seconds on my Mac. That suits "check before moving day", not interactive editing.
+- **Be precise about "open".** Gemma 3 is open-weight under Google's own terms, not open source in the OSI sense; the Gemma 4 build I tried ships with an Apache 2.0 licence file. The model name is a config value (`GEMMA_MODEL`). I compared `gemma3:4b` and `gemma4:e4b` on five images (see "Which Gemma?"), and the default and the demo use `gemma3:4b`.
+
+<!--
+TEMPLATE POSITION. The challenge template puts "My Agent Session" right here, after "Why Does Open Innovation
+Matter?", then "My First User", then "Prize Categories". Move a block out of this comment only when it is real.
+
+## My Agent Session
+
+[A link to, or an embed of, the session saved with DevRelay (devrelay.com). Say what to look at: the run where the
+photo boxes were measured and dropped, the placement fix, the ceiling-height fix, the model comparison. Check the
+transcript for personal data first: local paths, e-mail addresses, the Atlas cluster host name.]
+
+## My First User
+
+[One real person who uploaded a room photo, and what they said. Ask them first and leave out anything that
+identifies them.]
+-->
 
 ## Limitations
 
-- Every successful run so far used a diagram image, not a photograph, and Gemma mislabelled some objects in it. I have not yet measured how it does on real photos.
+- I have tried five room images, one run each, one of them a 3D render. Gemma gets a broad inventory of the room right more often than the layout: positions and sizes are rough, and it mislabelled a cat as a dog and listed a TV and a candle as floor objects. That is not a benchmark, and the app puts no photo boxes on compiled rooms because the model could not place them.
 - Gemma's geometry from a single photo is rough, which is why every object carries a label and a ±cm band.
 - There is no pixel-level calibration. The scale comes from Gemma's estimate using the reference object, and the app shows `px/cm: n/a` rather than inventing a ratio.
 - The moving quote is a formula, not a learned model.
