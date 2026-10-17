@@ -52,7 +52,7 @@ One node of the output looks like this (trimmed; values are illustrative):
   "label": "Queen Bed",
   "epistemic": "inferred",
   "confidence": 0.82,
-  "bbox2d": { "x": 0.10, "y": 0.40, "w": 0.30, "h": 0.30 },
+  "bbox2d": null,
   "footprint": { "xCm": 20, "yCm": 30, "widthCm": 154, "depthCm": 206, "heightCm": 70, "rotationDeg": 0 },
   "uncertainty": {
     "posPlusMinusCm": 8,
@@ -105,8 +105,8 @@ Stack: TypeScript, React, Vite, Tailwind, Three.js, Express, Zod, Vitest, Ollama
 
 **What broke.**
 
-- *Photo boxes.* Gemma copied the footprint's centimetre values into the field for the box around the object in the photo, so the boxes came out with zero area and, in the failing runs, every object was thrown away. I changed that field to integer corners from 0 to 1000 with the range enforced in the schema, and an unusable box now just means "no box" instead of "no object". After that, the first attempt succeeded in my runs.
-- *Placement.* Gemma still places some objects outside the room it just described, even when told not to. I couldn't prompt that away. The number is recorded, and the what-if check flags it as `OUT_OF_BOUNDS`.
+- *Photo boxes.* First Gemma copied the footprint's centimetre values into the box field, so every box had zero area. I fixed the wording, but on a real room photo the boxes then landed in the top-left corner of the photo, or on the wrong object (the bed's box over the window, a chair's box over a shelf), whether I asked for 0 to 1000 or for pixels. That was one photo, not a benchmark, but it was enough: the model is no longer asked for boxes. Compiled rooms have none, the UI says so, and only the hand-authored samples draw boxes on their photo.
+- *Placement.* Gemma also places objects outside the room it just described, even when told not to. On that same photo it put a 280 cm bed 300 cm from the west wall of a 360 cm room. I couldn't prompt that away, so the code moves such an object back inside, marks it `inferred` with a wider ± band, and writes the move into its reason. Its position is a guess, not a reading. The number of moved objects is recorded in the trace.
 
 **Optional integrations.** With `SENTRY_DSN` set, each compile is sent to Sentry as a `gen_ai.invoke_agent` trace: one span for the preflight check, one for each Gemma request (with Ollama's real input and output token counts), one for validation and one for the save. Photos, file names and prompt text are never attached. Without a DSN nothing is sent, and the header and `/api/health` say "not sending". With `MONGODB_URI` set, compiled RoomGraphs are stored in MongoDB Atlas; note that this includes the source photo, so it is an explicit opt-in.
 

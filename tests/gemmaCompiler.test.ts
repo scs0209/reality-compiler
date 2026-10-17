@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RoomGraphSchema } from '../shared/roomGraphSchema';
 import { PRESET_ROOMS } from '../shared/presetRooms';
+import { getRoomGraphById } from '../server/atlasStore';
 import { compileRoomPhoto } from '../server/gemmaCompiler';
 import { getSentryStatus } from '../server/sentryAgentTracer';
-import { assembleRoomGraph, parseGemmaScene } from '../server/gemmaScene';
+import { assembleRoomGraph, fitFootprintIntoRoom, parseGemmaScene } from '../server/gemmaScene';
 
 const PNG_1X1 =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
@@ -15,7 +16,6 @@ const object = (over: Record<string, unknown> = {}) => ({
   epistemic: 'observed',
   confidence: 0.9,
   evidence: 'Three floor corners and the headboard are visible.',
-  bbox2d: { x1: 100, y1: 400, x2: 400, y2: 700 },
   footprint: { xCm: 20, yCm: 30, widthCm: 154, depthCm: 206, heightCm: 70, rotationDeg: 0 },
   uncertainty: { posPlusMinusCm: 4, dimPlusMinusCm: 5, reason: 'Duvet overhang' },
   movable: true,
@@ -101,11 +101,11 @@ afterEach(() => {
 });
 
 describe('parseGemmaScene', () => {
-  it('drops invalid objects, clamps the bbox and caps overclaimed confidence', () => {
+  it('drops invalid objects, clamps confidence and caps overclaimed confidence', () => {
     const { scene, stats } = parseGemmaScene({
       ...validScene(),
       objects: [
-        object({ bbox2d: { x1: 800, y1: 100, x2: 1200, y2: 300 } }), // runs off the photo edge
+        object({ confidence: 1.4 }), // out of range
         object({
           label: 'Mini Fridge',
           epistemic: 'occluded_prior',
@@ -117,36 +117,114 @@ describe('parseGemmaScene', () => {
 
     expect(stats.objectsReturned).toBe(3);
     expect(stats.objectsKept).toBe(2);
-    expect(scene.objects[0].bbox2d?.w).toBeCloseTo(0.2);
+    expect(scene.objects[0].confidence).toBe(1);
     expect(stats.fieldsNormalized).toBe(1);
     expect(scene.objects[1].confidence).toBe(0.6);
     expect(stats.confidenceCapped).toBe(1);
     expect(stats.droppedReasons[0]).toMatch(/objects\[2\].*footprint\.widthCm/);
   });
 
-  it('keeps an object with bbox2d = null when the model gives an unusable photo box', () => {
-    // Gemma was seen copying footprint numbers into the box; clamped to 0-1000 this has no area.
-    const { scene, stats } = parseGemmaScene({
+  it('ignores a photo box if the model sends one anyway', () => {
+    const { scene } = parseGemmaScene({
       ...validScene(),
-      objects: [object({ bbox2d: { x1: 1500, y1: 1600, x2: 1700, y2: 1800 } })],
+      objects: [object({ bbox2d: { x1: 100, y1: 400, x2: 400, y2: 700 } })],
     });
 
     expect(scene.objects).toHaveLength(1);
-    expect(scene.objects[0].bbox2d).toBeNull();
-    expect(stats.bboxMissing).toBe(1);
+    expect(scene.objects[0]).not.toHaveProperty('bbox2d');
   });
 
-  it('counts objects that stick out of the room without dropping them', () => {
+  it('moves an object that sticks out of the room back inside and downgrades it to an estimate', () => {
     const { scene, stats } = parseGemmaScene({
       ...validScene(),
       objects: [
-        object(), // inside the 340x410 room
+        object(), // inside the 340x410 room: untouched
+        // 300 + 120 = 420 > 340, as the 4B model did with a bed in a real photo
         object({ label: 'Wardrobe', footprint: { xCm: 300, yCm: 20, widthCm: 120, depthCm: 60, heightCm: 200 } }),
       ],
     });
 
-    expect(scene.objects).toHaveLength(2);
+    const [bed, wardrobe] = scene.objects;
     expect(stats.outOfRoom).toBe(1);
+    expect(stats.repairedIntoRoom).toBe(1);
+    expect(wardrobe.footprint).toMatchObject({ xCm: 220, yCm: 20, widthCm: 120, depthCm: 60 });
+    // No longer an observation, its confidence follows the cap for an estimate, and the move is
+    // written into the uncertainty so the UI can show it.
+    expect(wardrobe.epistemic).toBe('inferred');
+    expect(wardrobe.confidence).toBe(0.85);
+    expect(wardrobe.uncertainty.posPlusMinusCm).toBe(80);
+    expect(wardrobe.uncertainty.reason).toMatch(/Placed outside the room.*moved 80 cm/);
+    expect(stats.confidenceCapped).toBe(1);
+    // The object that already fitted is exactly as the model gave it.
+    expect(bed.epistemic).toBe('observed');
+    expect(bed.confidence).toBe(0.9);
+    expect(bed.footprint).toMatchObject({ xCm: 20, yCm: 30, widthCm: 154, depthCm: 206 });
+    expect(bed.uncertainty.reason).toBe('Duvet overhang');
+  });
+
+  it('shrinks an object that is bigger than the room and keeps blind-spot objects blind-spot', () => {
+    const { scene } = parseGemmaScene({
+      ...validScene(),
+      objects: [
+        object({ label: 'Counter', footprint: { xCm: 10, yCm: 10, widthCm: 500, depthCm: 60, heightCm: 90 } }),
+        object({
+          label: 'Mini Fridge',
+          epistemic: 'occluded_prior',
+          confidence: 0.5,
+          footprint: { xCm: 330, yCm: 400, widthCm: 60, depthCm: 60, heightCm: 85 },
+        }),
+      ],
+    });
+
+    const [counter, fridge] = scene.objects;
+    expect(counter.footprint).toMatchObject({ xCm: 0, yCm: 10, widthCm: 340, depthCm: 60 });
+    expect(counter.uncertainty.dimPlusMinusCm).toBe(160);
+    expect(counter.uncertainty.reason).toMatch(/shrunk 160 cm/);
+    expect(fridge.epistemic).toBe('occluded_prior');
+    expect(fridge.footprint).toMatchObject({ xCm: 280, yCm: 350 });
+  });
+
+  it('measures a rotated object by its turned sides when fitting it into the room', () => {
+    const rotated = { xCm: 300, yCm: 300, widthCm: 100, depthCm: 200, heightCm: 80, rotationDeg: 90 };
+    // Turned a quarter, it spans 200 along x and 100 along y: 300 + 200 > 340 but 300 + 100 <= 410.
+    expect(fitFootprintIntoRoom(rotated, { widthCm: 340, depthCm: 410 })).toMatchObject({
+      footprint: { xCm: 140, yCm: 300, widthCm: 100, depthCm: 200 },
+      movedCm: 160,
+      shrunkCm: 0,
+    });
+    // Already inside: nothing to do.
+    expect(fitFootprintIntoRoom({ ...rotated, xCm: 100 }, { widthCm: 340, depthCm: 410 })).toBeNull();
+  });
+
+  it('leaves out windows, wall decor and things resting on furniture, and says which', () => {
+    // A bedroom answer from the 4B model listed all of these as floor objects.
+    const { scene, stats } = parseGemmaScene({
+      ...validScene(),
+      objects: [
+        object({ label: 'Bed', labelKo: '침대' }),
+        object({ label: 'Window', labelKo: '창문', category: 'opening' }),
+        object({ label: 'Curtain', labelKo: '커튼', category: 'obstacle' }),
+        object({ label: 'Mirror', labelKo: '거울', category: 'obstacle' }),
+        object({ label: 'Artwork', labelKo: '그림', category: 'obstacle' }),
+        object({ label: 'Pillow', labelKo: '베개' }),
+        object({ label: 'Book', labelKo: '책', category: 'obstacle' }),
+        object({ label: 'Floor Mirror', labelKo: '전신 거울' }), // stands on the floor: kept
+        object({ label: 'Bookshelf', labelKo: '책장' }), // not a book
+        object({ label: 'Bed Frame', labelKo: '침대 프레임' }), // not a picture frame
+      ],
+    });
+
+    expect(scene.objects.map((o) => o.label)).toEqual(['Bed', 'Floor Mirror', 'Bookshelf', 'Bed Frame']);
+    expect(stats.objectsReturned).toBe(10);
+    expect(stats.objectsKept).toBe(4);
+    expect(stats.skippedNotOnFloor).toEqual([
+      'Window (opening, listed under openings)',
+      'Curtain (wall-mounted)',
+      'Mirror (wall-mounted)',
+      'Artwork (wall-mounted)',
+      'Pillow (rests on furniture)',
+      'Book (rests on furniture)',
+    ]);
   });
 
   it('rejects an answer with no usable objects or no room', () => {
@@ -170,6 +248,8 @@ describe('assembleRoomGraph', () => {
 
     const parsed = RoomGraphSchema.omit({ compileMeta: true }).parse(graph);
     expect(parsed.nodes).toHaveLength(2);
+    // The model is not asked where objects are in the photo, so no node claims a photo region.
+    expect(parsed.nodes.every((n) => n.bbox2d === null)).toBe(true);
     expect(parsed.epistemicSummary.observedCount).toBe(2);
     expect(parsed.calibration.pixelToCmRatio).toBeNull();
     // Bed ends at x=174, lamp starts at x=176: a 2cm gap derived from footprints.
@@ -209,11 +289,20 @@ describe('compileRoomPhoto', () => {
     expect(roomGraph.compileMeta.sentrySpanId).toBe('');
     // No MongoDB URI in tests, so the save went to the in-memory copy only.
     expect(roomGraph.compileMeta.atlasPersisted).toBe(false);
+    // What was stored is the final document (with the measured latency and the final spans), not
+    // the one saved before those were known.
+    expect(await getRoomGraphById(roomGraph.sceneId)).toEqual(roomGraph);
 
     const [request] = ollama.chatCalls();
     expect(request.body.model).toBe('gemma3:4b');
     expect(request.body.format.required).toContain('objects');
     expect(request.body.messages[1].images).toHaveLength(1);
+    // Neither the schema nor the prompt asks the model to box objects in the photo.
+    const objectProps = request.body.format.properties.objects.items;
+    expect(objectProps.properties).not.toHaveProperty('bbox2d');
+    expect(objectProps.required).not.toContain('bbox2d');
+    expect(request.body.messages[0].content).not.toMatch(/bbox/i);
+    expect(roomGraph.nodes.every((n) => n.bbox2d === null)).toBe(true);
   });
 
   it('retries once with the validation error and records each attempt as its own span', async () => {
@@ -260,6 +349,33 @@ describe('compileRoomPhoto', () => {
       ['compiler.preflight', 'fallback'],
       ['compiler.fallback_preset', 'fallback'],
     ]);
+  });
+
+  it('tells the retry to be shorter when the first answer was cut off by the output limit', async () => {
+    const cutOff = new Response(
+      JSON.stringify({
+        model: 'gemma3:4b',
+        message: { content: '{"room":{"widthCm":340,"objects":[{"label":"Bed"' }, // never closed
+        prompt_eval_count: 1000,
+        eval_count: 3500,
+        done_reason: 'length',
+      }),
+      { status: 200 }
+    );
+    const ollama = stubOllama({
+      chat: (call) => (call === 1 ? cutOff : chatReply(JSON.stringify(validScene()))),
+    });
+
+    const { roomGraph, ollamaLiveUsed } = await compileRoomPhoto({ photoDataUrl: PNG_1X1, fileName: 'busy.png' });
+
+    expect(ollamaLiveUsed).toBe(true);
+    expect(roomGraph.compileMeta.runtime).toBe('ollama-gemma3:4b');
+    const [first, second] = ollama.chatCalls();
+    expect(first.body.messages[1].content).not.toMatch(/previous answer was rejected/);
+    expect(second.body.messages[1].content).toMatch(/cut off for being too long/);
+    expect(second.body.messages[1].content).toMatch(/at most 8 objects/);
+    // Tokens of the wasted first attempt are still counted.
+    expect(roomGraph.compileMeta.tokens.completion).toBe(3500 + 567);
   });
 
   it('reports a missing model without calling the chat endpoint', async () => {

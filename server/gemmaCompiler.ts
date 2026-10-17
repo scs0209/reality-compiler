@@ -84,6 +84,8 @@ interface OllamaChatResponse {
   prompt_eval_count?: number;
   eval_count?: number;
   total_duration?: number; // nanoseconds
+  // 'stop' when the model finished, 'length' when it hit num_predict and the text was cut off.
+  done_reason?: string;
 }
 
 class OllamaHttpError extends Error {
@@ -131,7 +133,9 @@ interface GemmaRun {
 
 const GraphWithoutMeta = RoomGraphSchema.omit({ compileMeta: true });
 
-type CallResult = { ok: true; content: string } | { ok: false; failure: Failure };
+type CallResult =
+  | { ok: true; content: string; truncated: boolean }
+  | { ok: false; failure: Failure };
 type AssembleResult =
   | { ok: true; graph: Omit<RoomGraph, 'compileMeta'>; stats: GemmaParseStats }
   | { ok: false; failure: Failure };
@@ -268,7 +272,9 @@ async function runGemma(
               'ollama.total_duration_ms': Math.round(res.total_duration / 1e6),
             }),
           });
-          return { ok: true, content: res.message?.content ?? '' };
+          const truncated = res.done_reason === 'length';
+          if (truncated) h.setAttributes({ 'gen_ai.response.finish_reason': 'length' });
+          return { ok: true, content: res.message?.content ?? '', truncated };
         } catch (err) {
           if (isAbort(err)) {
             return stop({
@@ -306,9 +312,13 @@ async function runGemma(
         try {
           json = JSON.parse(call.content);
         } catch {
+          // A busy room can use up the output budget before the JSON is closed. Say so, and tell the
+          // retry how to fit, instead of repeating the same long answer.
           return reject({
             stage: 'invalid_json',
-            reason: 'Gemma returned text that is not valid JSON.',
+            reason: call.truncated
+              ? 'it was cut off for being too long: list at most 8 objects and keep every text field under 10 words'
+              : 'Gemma returned text that is not valid JSON.',
           });
         }
 
@@ -327,11 +337,15 @@ async function runGemma(
             'gemma.objects_returned': stats.objectsReturned,
             'gemma.objects_kept': stats.objectsKept,
             'gemma.fields_normalized': stats.fieldsNormalized,
-            'gemma.bbox_missing': stats.bboxMissing,
             'gemma.objects_out_of_room': stats.outOfRoom,
+            'gemma.objects_moved_into_room': stats.repairedIntoRoom,
             'gemma.confidence_capped': stats.confidenceCapped,
             ...(stats.droppedReasons.length > 0 && {
               'gemma.dropped_reasons': stats.droppedReasons.join(' | ').slice(0, 300),
+            }),
+            'gemma.objects_skipped_not_on_floor': stats.skippedNotOnFloor.length,
+            ...(stats.skippedNotOnFloor.length > 0 && {
+              'gemma.skipped_not_on_floor': stats.skippedNotOnFloor.join(' | ').slice(0, 300),
             }),
             'epistemic.observed_count': graph.epistemicSummary.observedCount,
             'epistemic.inferred_count': graph.epistemicSummary.inferredCount,
@@ -484,6 +498,10 @@ export async function compileRoomPhoto(input: CompileRoomInput): Promise<{
       else trace.setRootStatus(run.attempts > 1 ? 'degraded' : 'ok');
 
       const validated = RoomGraphSchema.parse(graph);
+
+      // The first save ran before the latency, the persisted flag and the final spans were known,
+      // so the stored document would carry latencyMs 0 and atlasPersisted false. Store the final one.
+      if (run.graph) await saveRoomGraph(validated);
 
       recordAgentTrace({
         traceId: trace.traceId || createLocalTraceId(),

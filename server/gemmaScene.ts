@@ -12,7 +12,9 @@ import {
 // What Gemma is asked to produce. Smaller than RoomGraph on purpose: ids, edges, counts and the
 // calibration envelope are derived deterministically below instead of trusting a 4B model with them.
 
-export const GEMMA_MAX_OBJECTS = 14;
+// Each object costs roughly 150-300 output tokens; more than this does not fit the output budget
+// of a busy room and the JSON gets cut off.
+export const GEMMA_MAX_OBJECTS = 10;
 const GEMMA_MAX_OPENINGS = 6;
 const GEMMA_MAX_BLIND_SPOTS = 4;
 
@@ -40,8 +42,8 @@ const GemmaObjectSchema = z.object({
   epistemic: EpistemicStatusSchema,
   confidence: num,
   evidence: z.string().trim().max(300),
-  // Corners in thousandths of the photo (0,0 = top-left); converted to a normalised box below.
-  bbox2d: z.object({ x1: num, y1: num, x2: num, y2: num }),
+  // No photo box on purpose: gemma3:4b cannot point at objects (its boxes landed in a corner of the
+  // photo or on the wrong object), so it is not asked for one and RoomGraph nodes get bbox2d = null.
   footprint: z.object({
     xCm: num,
     yCm: num,
@@ -86,9 +88,8 @@ const GemmaSceneEnvelopeSchema = z.object({
   blindSpots: z.array(z.unknown()).default([]),
 });
 
-type BBox = { x: number; y: number; w: number; h: number };
-// A validated object with its photo box already converted to a normalised box (or null).
-type GemmaObject = Omit<z.infer<typeof GemmaObjectSchema>, 'bbox2d'> & { bbox2d: BBox | null };
+type GemmaObject = z.infer<typeof GemmaObjectSchema>;
+type Footprint = GemmaObject['footprint'];
 type GemmaOpening = z.infer<typeof GemmaOpeningSchema>;
 type GemmaBlindSpot = z.infer<typeof GemmaBlindSpotSchema>;
 
@@ -104,17 +105,39 @@ export interface GemmaParseStats {
   objectsKept: number;
   openingsReturned: number;
   openingsKept: number;
-  // Out-of-range bbox/confidence values that were clamped into range.
+  // Out-of-range confidence values that were clamped into range.
   fieldsNormalized: number;
-  // Objects kept without a photo box because the model's box was unusable.
-  bboxMissing: number;
-  // Objects whose footprint sticks out of the room the model itself reported (kept; the what-if
-  // engine flags them as OUT_OF_BOUNDS, and the count shows how far to trust the geometry).
+  // Objects whose footprint, as the model gave it, stuck out of the room the model itself reported.
+  // The count shows how far to trust the geometry.
   outOfRoom: number;
+  // Of those, objects that were moved (and, if bigger than the room, shrunk) to fit inside it.
+  // They are downgraded to an estimate; see fitFootprintIntoRoom.
+  repairedIntoRoom: number;
   // Objects whose confidence was lowered because it overclaimed for their epistemic status.
   confidenceCapped: number;
   // First few reasons objects were rejected (field path + message), for retries and traces.
   droppedReasons: string[];
+  // Objects left out because they are not floor-standing (see notOnFloorReason), first few only.
+  skippedNotOnFloor: string[];
+}
+
+// Windows and doors belong in `openings`; curtains and wall art hang on a wall; pillows and books
+// sit on furniture. A small model lists them anyway, and they would then be drawn as boxes on the
+// floor and counted as obstacles in a move, so they are left out and the skip is recorded.
+const WALL_MOUNTED =
+  /\b(curtains?|blinds?|drapes?|pictures?|paintings?|artwork|posters?|wall art|wall clock|photo frame|picture frame)\b|커튼|블라인드|액자|포스터|벽걸이/i;
+const MIRROR = /\bmirror\b|거울/i;
+const FLOOR_MIRROR = /\b(floor|standing|full[- ]length)\b|전신|스탠딩/i;
+const RESTING_ON_FURNITURE =
+  /\b(pillows?|cushions?|blankets?|duvet|comforter|laptop|notebook|books?|magazines?|mug|cup|vase|(table|desk|bedside) lamp)\b|베개|쿠션|이불|담요|노트북/i;
+
+export function notOnFloorReason(o: Pick<GemmaObject, 'label' | 'labelKo' | 'category'>): string | null {
+  const text = `${o.label} ${o.labelKo}`;
+  if (o.category === 'opening') return 'opening, listed under openings';
+  if (WALL_MOUNTED.test(text)) return 'wall-mounted';
+  if (MIRROR.test(text) && !FLOOR_MIRROR.test(text)) return 'wall-mounted';
+  if (RESTING_ON_FURNITURE.test(text)) return 'rests on furniture';
+  return null;
 }
 
 const CONFIDENCE_CAP: Record<EpistemicStatus, number> = {
@@ -124,6 +147,37 @@ const CONFIDENCE_CAP: Record<EpistemicStatus, number> = {
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/**
+ * Moves a footprint inside the room (and shrinks it if it is bigger than the room). Returns null
+ * when it already fits. xCm/yCm is the corner of the rotated rectangle, as in the what-if engine.
+ * Only the position changes unless the object cannot fit at all, so sizes the model gave stay as
+ * they are. movedCm is how far the corner travelled, shrunkCm how much a side was cut.
+ */
+export function fitFootprintIntoRoom(
+  f: Footprint,
+  room: { widthCm: number; depthCm: number }
+): { footprint: Footprint; movedCm: number; shrunkCm: number } | null {
+  const rotated = Math.abs((f.rotationDeg ?? 0) % 180) === 90;
+  const spanX = rotated ? f.depthCm : f.widthCm;
+  const spanY = rotated ? f.widthCm : f.depthCm;
+  const fitX = Math.min(spanX, room.widthCm);
+  const fitY = Math.min(spanY, room.depthCm);
+  const x = clamp(f.xCm, 0, room.widthCm - fitX);
+  const y = clamp(f.yCm, 0, room.depthCm - fitY);
+  if (x === f.xCm && y === f.yCm && fitX === spanX && fitY === spanY) return null;
+  return {
+    footprint: {
+      ...f,
+      xCm: x,
+      yCm: y,
+      widthCm: rotated ? fitY : fitX,
+      depthCm: rotated ? fitX : fitY,
+    },
+    movedCm: Math.round(Math.max(Math.abs(x - f.xCm), Math.abs(y - f.yCm))),
+    shrunkCm: Math.round(Math.max(spanX - fitX, spanY - fitY)),
+  };
+}
 
 export function parseGemmaScene(raw: unknown): { scene: GemmaScene; stats: GemmaParseStats } {
   const envelope = GemmaSceneEnvelopeSchema.safeParse(raw);
@@ -137,10 +191,11 @@ export function parseGemmaScene(raw: unknown): { scene: GemmaScene; stats: Gemma
     openingsReturned: envelope.data.openings.length,
     openingsKept: 0,
     fieldsNormalized: 0,
-    bboxMissing: 0,
     outOfRoom: 0,
+    repairedIntoRoom: 0,
     confidenceCapped: 0,
     droppedReasons: [],
+    skippedNotOnFloor: [],
   };
   const reject = (index: number, why: string) => {
     if (stats.droppedReasons.length < 3) stats.droppedReasons.push(`objects[${index}] ${why}`);
@@ -155,43 +210,41 @@ export function parseGemmaScene(raw: unknown): { scene: GemmaScene; stats: Gemma
     }
     const o = parsed.data;
 
-    // The footprint is what the what-if engine uses, so an unusable photo box does not cost the
-    // object: it is kept with bbox2d = null and counted.
-    const { x1, y1, x2, y2 } = o.bbox2d;
-    const box = {
-      x: clamp(x1, 0, 1000) / 1000,
-      y: clamp(y1, 0, 1000) / 1000,
-      w: (clamp(x2, 0, 1000) - clamp(x1, 0, 1000)) / 1000,
-      h: (clamp(y2, 0, 1000) - clamp(y1, 0, 1000)) / 1000,
-    };
-    let bbox2d: BBox | null = box.w > 0 && box.h > 0 ? box : null;
-    if (bbox2d === null) {
-      stats.bboxMissing += 1;
-    } else if (x1 < 0 || y1 < 0 || x2 > 1000 || y2 > 1000) {
-      stats.fieldsNormalized += 1;
+    const notOnFloor = notOnFloorReason(o);
+    if (notOnFloor) {
+      if (stats.skippedNotOnFloor.length < 6) stats.skippedNotOnFloor.push(`${o.label} (${notOnFloor})`);
+      continue;
     }
 
-    let confidence = clamp(o.confidence, 0, 1);
-    if (confidence !== o.confidence) stats.fieldsNormalized += 1;
-    if (confidence > CONFIDENCE_CAP[o.epistemic]) {
-      confidence = CONFIDENCE_CAP[o.epistemic];
+    // A footprint that leaves the room the model just described is impossible. Pull it back inside
+    // and stop calling it an observation: its position is a guess now.
+    let fitted: GemmaObject = o;
+    const fit = fitFootprintIntoRoom(o.footprint, envelope.data.room);
+    if (fit) {
+      stats.outOfRoom += 1;
+      stats.repairedIntoRoom += 1;
+      fitted = {
+        ...o,
+        epistemic: o.epistemic === 'observed' ? 'inferred' : o.epistemic,
+        footprint: fit.footprint,
+        uncertainty: {
+          posPlusMinusCm: Math.max(o.uncertainty.posPlusMinusCm, fit.movedCm),
+          dimPlusMinusCm: Math.max(o.uncertainty.dimPlusMinusCm, fit.shrunkCm),
+          reason: `Placed outside the room by the model; moved ${fit.movedCm} cm${fit.shrunkCm > 0 ? ` and shrunk ${fit.shrunkCm} cm` : ''} to fit inside. ${o.uncertainty.reason}`
+            .trim()
+            .slice(0, 300),
+        },
+      };
+    }
+
+    let confidence = clamp(fitted.confidence, 0, 1);
+    if (confidence !== fitted.confidence) stats.fieldsNormalized += 1;
+    if (confidence > CONFIDENCE_CAP[fitted.epistemic]) {
+      confidence = CONFIDENCE_CAP[fitted.epistemic];
       stats.confidenceCapped += 1;
     }
 
-    const f = o.footprint;
-    const rotated = Math.abs((f.rotationDeg ?? 0) % 180) === 90;
-    const fw = rotated ? f.depthCm : f.widthCm;
-    const fd = rotated ? f.widthCm : f.depthCm;
-    if (
-      f.xCm < 0 ||
-      f.yCm < 0 ||
-      f.xCm + fw > envelope.data.room.widthCm ||
-      f.yCm + fd > envelope.data.room.depthCm
-    ) {
-      stats.outOfRoom += 1;
-    }
-
-    objects.push({ ...o, bbox2d, confidence });
+    objects.push({ ...fitted, confidence });
   }
   if (objects.length === 0) {
     throw new Error(
@@ -266,7 +319,7 @@ export function assembleRoomGraph(
     epistemic: o.epistemic,
     confidence: round(o.confidence, 2),
     evidenceSource: o.evidence || 'Gemma 3 vision estimate',
-    bbox2d: o.bbox2d,
+    bbox2d: null, // the model is not asked to locate objects in the photo
     footprint: {
       xCm: round(o.footprint.xCm),
       yCm: round(o.footprint.yCm),
@@ -388,12 +441,6 @@ export function deriveEdges(nodes: RoomObjectNode[]): SpatialRelationEdge[] {
 
 // JSON Schema handed to Ollama's `format` so decoding is constrained to this shape.
 const enumOf = (values: readonly string[]) => ({ type: 'string', enum: [...values] });
-const bboxCoord = (description: string) => ({
-  type: 'integer',
-  minimum: 0,
-  maximum: 1000,
-  description: `${description}, 0-1000`,
-});
 const numberField = (description?: string) => ({ type: 'number', ...(description ? { description } : {}) });
 
 export const GEMMA_RESPONSE_JSON_SCHEMA = {
@@ -423,17 +470,6 @@ export const GEMMA_RESPONSE_JSON_SCHEMA = {
           epistemic: enumOf(EPISTEMIC),
           confidence: numberField('0-1'),
           evidence: { type: 'string', description: 'what in the photo supports this object and its size' },
-          bbox2d: {
-            type: 'object',
-            description: 'box around the object in the PHOTO, in thousandths of the photo size (NOT cm)',
-            properties: {
-              x1: bboxCoord('left edge'),
-              y1: bboxCoord('top edge'),
-              x2: bboxCoord('right edge'),
-              y2: bboxCoord('bottom edge'),
-            },
-            required: ['x1', 'y1', 'x2', 'y2'],
-          },
           footprint: {
             type: 'object',
             properties: {
@@ -460,7 +496,7 @@ export const GEMMA_RESPONSE_JSON_SCHEMA = {
           disassemblyRequired: { type: 'boolean' },
         },
         required: [
-          'label', 'labelKo', 'category', 'epistemic', 'confidence', 'evidence', 'bbox2d',
+          'label', 'labelKo', 'category', 'epistemic', 'confidence', 'evidence',
           'footprint', 'uncertainty', 'movable', 'weightKgEst', 'disassemblyRequired',
         ],
       },
@@ -505,16 +541,15 @@ export const GEMMA3_SYSTEM_PROMPT = `You are Reality Compiler, a spatial analyst
 Coordinate system (top-down floor plan, centimetres): origin is the north-west corner of the room, x grows east, y grows south. Room width runs along x, depth along y. An object's footprint is its axis-aligned rectangle: xCm,yCm is its north-west corner, widthCm runs along x, depthCm along y, heightCm is vertical. rotationDeg is 0 or 90 only.
 Every footprint must lie inside the room: xCm + widthCm <= room.widthCm and yCm + depthCm <= room.depthCm. Decide the room size first, then place objects inside it.
 Openings: wall is the wall the opening is on; offsetCm is measured from the west end for north/south walls and from the north end for east/west walls.
-bbox2d is the object's box in the PHOTO, as integers from 0 to 1000 (thousandths of the photo width and height; x1,y1 = top-left corner, x2,y2 = bottom-right corner). bbox2d is pixels-in-the-photo, NOT centimetres: never copy footprint numbers into it.
 
-Scale: use the reference object named by the user to convert what you see into centimetres. Everything else is an estimate; use standard furniture sizes as priors.
+Scale: use the reference object named by the user to convert what you see into centimetres. Everything else is an estimate; use standard furniture sizes as priors. Typical sizes in cm (width x depth x height): single bed 100x200x45, double or queen bed 140-160x200x45, two-seat sofa 150-180x85x85, desk 100-140x50-70x75, chair 45x45x85, bedside table 40x40x50, wardrobe 100-200x50-60x200, bookshelf 80x30x180. Do not give an object a dimension more than about 1.3 times these unless it is clearly bigger.
 
 Epistemic status (be conservative, this is the point of the product):
 - observed: you can directly see the object's floor contact edges or corners.
 - inferred: partly hidden, or sized from a standard-furniture prior.
 - occluded_prior: not visible, deduced from context. Never give it confidence above 0.6.
-Give every object an uncertainty band (posPlusMinusCm, dimPlusMinusCm) and a short reason. Typical values: observed +/-3-6 cm, inferred +/-8-15 cm, occluded_prior +/-15-30 cm.
-List at most ${GEMMA_MAX_OBJECTS} objects: movable furniture, appliances and obstacles that matter for a move. Put doors, windows and arches under openings, not objects. Do not invent objects you cannot see or reasonably infer. Put hidden or unreliable regions in blindSpots. labelKo is the Korean name of the object.`;
+Give every object an uncertainty band (posPlusMinusCm, dimPlusMinusCm) and a short reason. Keep every text field terse: evidence under 12 words, reason under 8 words. Typical values: observed +/-3-6 cm, inferred +/-8-15 cm, occluded_prior +/-15-30 cm.
+List at most ${GEMMA_MAX_OBJECTS} objects, and only things that stand on the floor and matter for a move: movable furniture, appliances and floor obstacles. Do NOT list wall-mounted things (curtains, blinds, mirrors on a wall, pictures, posters, clocks), things resting on furniture (pillows, blankets, books, laptops, table lamps), or doors, windows and arches (those go under openings). Do not invent objects you cannot see or reasonably infer. Put hidden or unreliable regions in blindSpots. labelKo is the Korean name of the object.`;
 
 export function buildGemmaUserPrompt(opts: {
   referenceObject: string;
@@ -524,7 +559,7 @@ export function buildGemmaUserPrompt(opts: {
 }): string {
   const notes = (opts.roomNotes || '').slice(0, 500).trim() || 'none';
   const lines = [
-    `Reference object visible in the photo: ${opts.referenceObject} = ${opts.referenceDimensionCm} cm.`,
+    `Scale reference chosen by the user (it may not actually be in the photo): ${opts.referenceObject} = ${opts.referenceDimensionCm} cm. If you cannot find it, size objects from the typical sizes above and set room.scaleConfidence below 0.5.`,
     `Notes from the user: ${notes}`,
     'Compile this photo into the JSON schema.',
   ];
