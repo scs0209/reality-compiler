@@ -41,7 +41,7 @@ So the output is data with its doubt attached:
 
 - **Every object says how it is known.** Each node is `observed` (its floor corners were visible), `inferred` (partly hidden, or sized from a standard-furniture prior) or `occluded_prior` (in a blind spot, deduced from context). It also carries a confidence and a ±cm band on position and size.
 - **A moving what-if check runs on top of that.** It evaluates the layout twice: with the nominal numbers, and with every error band pushed the wrong way. It reports `DOOR_BOTTLENECK`, `OBJECT_COLLISION`, `OUT_OF_BOUNDS` and `UNCERTAINTY_OVERFLOW`, so a 2 cm gap that could really be negative becomes "measure this one gap with a tape measure" instead of a green tick.
-- **A workbench to look at it.** A 2D top-down blueprint (drag, rotate by 90°, drop in a King bed or a washer-dryer to test), a 3D view where observed objects are solid and inferred or occluded ones show their uncertainty as wireframe shells, JSON and CSV export, and an English/Korean UI.
+- **A workbench to look at it.** A 2D top-down blueprint (drag, rotate by 90°, drop in a King bed or a washer-dryer to test), a 3D view (Three.js) where observed objects are solid, inferred ones see-through and occluded ones ghosted, with dashed ±cm uncertainty shells, and where you can drag objects across the floor, JSON and CSV export, and an English/Korean UI.
 - **A rough moving quote.** It is a hand-written formula over volume, weight and disassembly count, with a wider upper bound when many objects are inferred. It is not machine learning, and the P10/P90 values are heuristic spreads, not calibrated quantiles.
 
 One node of the output looks like this (trimmed; values are illustrative):
@@ -84,7 +84,7 @@ If Gemma can't produce a usable answer, the app does not pretend. It shows a bun
 
 Repository: [github.com/scs0209/reality-compiler](https://github.com/scs0209/reality-compiler)
 
-Stack: TypeScript, React, Vite, Tailwind, Express, Zod, Vitest, Ollama. The code is MIT-licensed; Gemma is not part of the repo and stays under Google's Gemma Terms of Use.
+Stack: TypeScript, React, Vite, Tailwind, Three.js, Express, Zod, Vitest, Ollama. The code is MIT-licensed; Gemma is not part of the repo and stays under Google's Gemma Terms of Use.
 
 - `shared/roomGraphSchema.ts`: the `roomgraph.v1.2` schema.
 - `server/gemmaCompiler.ts`: the Ollama call, the retry, and the fallback.

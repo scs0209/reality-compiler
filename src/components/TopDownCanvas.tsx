@@ -1,8 +1,10 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, Suspense } from 'react';
 import type { RoomGraph, RoomObjectNode } from '../../shared/roomGraphSchema';
 import { getNodeRect } from '../../shared/spatialEngine';
 import { useI18n, nodeLabel } from '../i18n';
 import { ToggleChip } from './ToggleChip';
+// three.js is large, so the 3D scene is its own chunk and the rest of the app renders first.
+const Scene3D = React.lazy(() => import('./Scene3D').then((m) => ({ default: m.Scene3D })));
 import {
   RotateCw,
   Plus,
@@ -48,18 +50,9 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
   const { t, lang } = useI18n();
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('3d');
-  const [yawDeg, setYawDeg] = useState<number>(38);
-  const [pitchDeg, setPitchDeg] = useState<number>(28);
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
-  const [orbitDragging, setOrbitDragging] = useState<boolean>(false);
-  const [orbitStart, setOrbitStart] = useState<{ x: number; y: number; yaw: number; pitch: number }>({
-    x: 0,
-    y: 0,
-    yaw: 38,
-    pitch: 28,
-  });
 
   const pad = 42;
   const envW = graph.roomEnvelope.widthCm;
@@ -98,17 +91,11 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
       const nextX = Math.max(-20, Math.min(envW - 20, pt.x - dragOffset.dx));
       const nextY = Math.max(-20, Math.min(envD - 20, pt.y - dragOffset.dy));
       onUpdateNodePosition(draggingId, nextX, nextY);
-    } else if (viewMode === '3d' && orbitDragging) {
-      const dx = e.clientX - orbitStart.x;
-      const dy = e.clientY - orbitStart.y;
-      setYawDeg(((orbitStart.yaw + dx * 0.45) % 360 + 360) % 360);
-      setPitchDeg(Math.max(12, Math.min(68, orbitStart.pitch + dy * 0.35)));
     }
   };
 
   const handlePointerUp = () => {
     setDraggingId(null);
-    setOrbitDragging(false);
   };
 
   // Evidence palette: observed = muted cyan, estimated = amber, low-confidence = muted orange.
@@ -149,140 +136,6 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
     };
   };
 
-  // Isometric / Axonometric 3D Projection Helper (xCm, yCm, zCm -> SVG 2D)
-  const isoW = 760;
-  const isoH = 440;
-  const project3D = (xCm: number, yCm: number, zCm: number): Point2D => {
-    const cx = envW / 2;
-    const cy = envD / 2;
-    const dx = xCm - cx;
-    const dy = yCm - cy;
-    const radYaw = (yawDeg * Math.PI) / 180;
-    const radPitch = (pitchDeg * Math.PI) / 180;
-
-    const rx = dx * Math.cos(radYaw) - dy * Math.sin(radYaw);
-    const ry = dx * Math.sin(radYaw) + dy * Math.cos(radYaw);
-
-    const scale = 0.92;
-    const sx = isoW / 2 + rx * scale;
-    const sy = isoH * 0.62 + (ry * Math.sin(radPitch) - zCm * Math.cos(radPitch) * 0.82) * scale;
-    return { x: Number(sx.toFixed(1)), y: Number(sy.toFixed(1)) };
-  };
-
-  const polyPoints = (pts: Point2D[]) => pts.map((p) => `${p.x},${p.y}`).join(' ');
-
-  const renderCuboid = (
-    x1: number,
-    y1: number,
-    w: number,
-    d: number,
-    h: number,
-    opts: {
-      stroke: string;
-      topFill: string;
-      sideFill: string;
-      dash?: string;
-      strokeWidth?: number;
-    }
-  ) => {
-    const x2 = x1 + w;
-    const y2 = y1 + d;
-    // Bottom 4 corners (z=0)
-    const b0 = project3D(x1, y1, 0);
-    const b1 = project3D(x2, y1, 0);
-    const b2 = project3D(x2, y2, 0);
-    const b3 = project3D(x1, y2, 0);
-    // Top 4 corners (z=h)
-    const t0 = project3D(x1, y1, h);
-    const t1 = project3D(x2, y1, h);
-    const t2 = project3D(x2, y2, h);
-    const t3 = project3D(x1, y2, h);
-
-    const sw = opts.strokeWidth ?? 1.6;
-
-    return (
-      <g>
-        {/* Floor footprint */}
-        <polygon
-          points={polyPoints([b0, b1, b2, b3])}
-          fill={opts.sideFill}
-          stroke={opts.stroke}
-          strokeWidth={sw * 0.8}
-          strokeDasharray={opts.dash}
-        />
-        {/* Front-left & front-right vertical faces */}
-        <polygon
-          points={polyPoints([b3, b2, t2, t3])}
-          fill={opts.sideFill}
-          stroke={opts.stroke}
-          strokeWidth={sw}
-          strokeDasharray={opts.dash}
-        />
-        <polygon
-          points={polyPoints([b1, b2, t2, t1])}
-          fill={opts.sideFill}
-          stroke={opts.stroke}
-          strokeWidth={sw}
-          strokeDasharray={opts.dash}
-        />
-        {/* Vertical pillar edges */}
-        <line
-          x1={b0.x}
-          y1={b0.y}
-          x2={t0.x}
-          y2={t0.y}
-          stroke={opts.stroke}
-          strokeWidth={sw * 0.8}
-          strokeDasharray={opts.dash}
-        />
-        <line
-          x1={b1.x}
-          y1={b1.y}
-          x2={t1.x}
-          y2={t1.y}
-          stroke={opts.stroke}
-          strokeWidth={sw}
-          strokeDasharray={opts.dash}
-        />
-        <line
-          x1={b2.x}
-          y1={b2.y}
-          x2={t2.x}
-          y2={t2.y}
-          stroke={opts.stroke}
-          strokeWidth={sw}
-          strokeDasharray={opts.dash}
-        />
-        <line
-          x1={b3.x}
-          y1={b3.y}
-          x2={t3.x}
-          y2={t3.y}
-          stroke={opts.stroke}
-          strokeWidth={sw}
-          strokeDasharray={opts.dash}
-        />
-        {/* Top roof face */}
-        <polygon
-          points={polyPoints([t0, t1, t2, t3])}
-          fill={opts.topFill}
-          stroke={opts.stroke}
-          strokeWidth={sw}
-          strokeDasharray={opts.dash}
-        />
-      </g>
-    );
-  };
-
-  // Sort nodes back-to-front in 3D based on rotated depth (painter's algorithm)
-  const sorted3DNodes = [...graph.nodes].sort((a, b) => {
-    const ra = getNodeRect(a, 0);
-    const rb = getNodeRect(b, 0);
-    const pa = project3D(ra.cx, ra.cy, 0);
-    const pb = project3D(rb.cx, rb.cy, 0);
-    return pa.y - pb.y;
-  });
-
   return (
     <div className="panel flex flex-col overflow-hidden">
       {/* Toolbar */}
@@ -317,7 +170,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
           </div>
           <span className="hidden whitespace-nowrap rounded border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 font-mono text-sky-300 sm:inline-block">
             {viewMode === '3d'
-              ? t('canvas.hint3d', { yaw: Math.round(yawDeg), pitch: Math.round(pitchDeg) })
+              ? t('canvas.hint3d')
               : t('canvas.hint2d')}
           </span>
         </div>
@@ -399,239 +252,28 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
       </div>
 
       {/* Canvas Viewport: 3D Volumetric Wireframe OR 2D Metric Blueprint */}
-      <div className="relative flex min-h-[320px] flex-1 select-none items-center justify-center bg-slate-950 p-3 lg:min-h-[480px]">
+      <div
+        className={`relative flex flex-1 select-none items-center justify-center bg-slate-950 ${
+          viewMode === '3d' ? '' : 'min-h-[320px] p-3 lg:min-h-[480px]'
+        }`}
+      >
         {viewMode === '3d' ? (
-          <svg
-            viewBox={`0 0 ${isoW} ${isoH}`}
-            className="w-full max-h-[620px] touch-none cursor-grab active:cursor-grabbing"
-            onPointerDown={(e) => {
-              setOrbitDragging(true);
-              setOrbitStart({
-                x: e.clientX,
-                y: e.clientY,
-                yaw: yawDeg,
-                pitch: pitchDeg,
-              });
-            }}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerLeave={handlePointerUp}
+          <Suspense
+            fallback={
+              <div className="flex h-[420px] w-full items-center justify-center text-xs text-slate-400 sm:h-[520px] lg:h-[580px]">
+                {t('canvas.3d.loading')}
+              </div>
+            }
           >
-            {/* 3D Room Floor & Ceiling Wireframe Envelope */}
-            {(() => {
-              const f0 = project3D(0, 0, 0);
-              const f1 = project3D(envW, 0, 0);
-              const f2 = project3D(envW, envD, 0);
-              const f3 = project3D(0, envD, 0);
-              const c0 = project3D(0, 0, envH);
-              const c1 = project3D(envW, 0, envH);
-              const c3 = project3D(0, envD, envH);
-
-              const gridLines: React.ReactNode[] = [];
-              for (let gx = 50; gx < envW; gx += 50) {
-                const pA = project3D(gx, 0, 0);
-                const pB = project3D(gx, envD, 0);
-                gridLines.push(
-                  <line
-                    key={`gx-${gx}`}
-                    x1={pA.x}
-                    y1={pA.y}
-                    x2={pB.x}
-                    y2={pB.y}
-                    stroke="rgba(142,160,181,0.12)"
-                    strokeWidth="1"
-                  />
-                );
-              }
-              for (let gy = 50; gy < envD; gy += 50) {
-                const pA = project3D(0, gy, 0);
-                const pB = project3D(envW, gy, 0);
-                gridLines.push(
-                  <line
-                    key={`gy-${gy}`}
-                    x1={pA.x}
-                    y1={pA.y}
-                    x2={pB.x}
-                    y2={pB.y}
-                    stroke="rgba(142,160,181,0.12)"
-                    strokeWidth="1"
-                  />
-                );
-              }
-
-              return (
-                <g>
-                  {/* Back North & West Walls */}
-                  <polygon
-                    points={polyPoints([f0, f1, c1, c0])}
-                    fill="rgba(36, 50, 68, 0.45)"
-                    stroke="#475A6F"
-                    strokeWidth="1.5"
-                  />
-                  <polygon
-                    points={polyPoints([f0, f3, c3, c0])}
-                    fill="rgba(11, 16, 23, 0.55)"
-                    stroke="#475A6F"
-                    strokeWidth="1.5"
-                  />
-                  {/* Floor Plane */}
-                  <polygon
-                    points={polyPoints([f0, f1, f2, f3])}
-                    fill="rgba(11, 16, 23, 0.9)"
-                    stroke="#74869C"
-                    strokeWidth="2.5"
-                  />
-                  {gridLines}
-                  <text
-                    x={c0.x}
-                    y={c0.y - 10}
-                    fill="#8EA0B5"
-                    fontSize="11"
-                    fontFamily="JetBrains Mono, monospace"
-                  >
-                    {t('canvas.svg.envelope', { w: envW, d: envD, h: envH, u: graph.roomEnvelope.uncertaintyCm })}
-                  </text>
-                </g>
-              );
-            })()}
-
-            {/* 3D Spatial Relation Edges */}
-            {showRelationEdges &&
-              graph.edges.map((edge) => {
-                const fromNode = graph.nodes.find((n) => n.id === edge.from);
-                const toNode = graph.nodes.find((n) => n.id === edge.to);
-                if (!fromNode || !toNode) return null;
-                const rA = getNodeRect(fromNode, 0);
-                const rB = getNodeRect(toNode, 0);
-                const pA = project3D(rA.cx, rA.cy, fromNode.footprint.heightCm * 0.5);
-                const pB = project3D(rB.cx, rB.cy, toNode.footprint.heightCm * 0.5);
-                const mx = (pA.x + pB.x) / 2;
-                const my = (pA.y + pB.y) / 2;
-                return (
-                  <g key={`3d-${edge.id}`}>
-                    <line
-                      x1={pA.x}
-                      y1={pA.y}
-                      x2={pB.x}
-                      y2={pB.y}
-                      stroke="#8197BD"
-                      strokeWidth="1.8"
-                      strokeDasharray="4,3"
-                    />
-                    <rect
-                      x={mx - 42}
-                      y={my - 9}
-                      width={84}
-                      height={17}
-                      rx="4"
-                      fill="#161E2C"
-                      stroke="#637CA6"
-                    />
-                    <text
-                      x={mx}
-                      y={my + 3}
-                      textAnchor="middle"
-                      fill="#C5D1E6"
-                      fontSize="8.5"
-                      fontFamily="JetBrains Mono, monospace"
-                    >
-                      {edge.relation} ({edge.distanceCm}±{edge.uncertaintyCm}cm)
-                    </text>
-                  </g>
-                );
-              })}
-
-            {/* 3D Furniture Cuboids & Outer ±cm Uncertainty Shells */}
-            {sorted3DNodes.map((node) => {
-              const rect = getNodeRect(node, 0);
-              const uncBand =
-                node.uncertainty.posPlusMinusCm + node.uncertainty.dimPlusMinusCm;
-              const haloRect = getNodeRect(node, uncBand);
-              const st = epistemicStyle(node.epistemic);
-              const isSelected = selectedNodeId === node.id;
-              const roofCenter = project3D(
-                rect.cx,
-                rect.cy,
-                node.footprint.heightCm + 12
-              );
-
-              return (
-                <g
-                  key={`3d-node-${node.id}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectNode(node.id);
-                  }}
-                  className="cursor-pointer"
-                >
-                  {/* Outer 3D ±cm Epistemic Uncertainty Wireframe Shell */}
-                  {showUncertaintyHalo &&
-                    renderCuboid(
-                      haloRect.x1,
-                      haloRect.y1,
-                      haloRect.w,
-                      haloRect.d,
-                      node.footprint.heightCm + node.uncertainty.dimPlusMinusCm,
-                      {
-                        stroke: st.haloStroke,
-                        topFill: 'rgba(251, 191, 36, 0.04)',
-                        sideFill: 'rgba(251, 191, 36, 0.03)',
-                        dash: '3,3',
-                        strokeWidth: 1.1,
-                      }
-                    )}
-
-                  {/* Nominal 3D Volume */}
-                  {renderCuboid(
-                    rect.x1,
-                    rect.y1,
-                    rect.w,
-                    rect.d,
-                    node.footprint.heightCm,
-                    {
-                      stroke: isSelected ? '#22D3EE' : st.stroke,
-                      topFill: st.topFill,
-                      sideFill: st.sideFill,
-                      dash: st.dash,
-                      strokeWidth: isSelected ? 2.6 : 1.7,
-                    }
-                  )}
-
-                  {/* Floating 3D HUD Tag */}
-                  <rect
-                    x={roofCenter.x - 58}
-                    y={roofCenter.y - 18}
-                    width={116}
-                    height={26}
-                    rx="4"
-                    fill="rgba(11, 16, 23, 0.88)"
-                    stroke={isSelected ? '#22D3EE' : st.stroke}
-                    strokeWidth="1"
-                  />
-                  <text
-                    x={roofCenter.x}
-                    y={roofCenter.y - 6}
-                    textAnchor="middle"
-                    fill="#E6EDF5"
-                    fontSize="9.5"
-                    fontWeight="600"
-                  >
-                    {nodeLabel(node, lang)}
-                  </text>
-                  <text
-                    x={roofCenter.x}
-                    y={roofCenter.y + 4}
-                    textAnchor="middle"
-                    fill={st.stroke}
-                    fontSize="8"
-                    fontFamily="JetBrains Mono, monospace"
-                  >
-                    {rect.w}×{rect.d}×{node.footprint.heightCm}cm (±{uncBand}cm)
-                  </text>
-                </g>
-              );
-            })}
-          </svg>
+            <Scene3D
+              graph={graph}
+              selectedNodeId={selectedNodeId}
+              onSelectNode={onSelectNode}
+              onUpdateNodePosition={onUpdateNodePosition}
+              showUncertaintyHalo={showUncertaintyHalo}
+              showRelationEdges={showRelationEdges}
+            />
+          </Suspense>
         ) : (
           <svg
             ref={svgRef}

@@ -108,8 +108,10 @@ const en = {
 
   'canvas.mode3d': '3D Epistemic Volumes',
   'canvas.mode2d': '2D Metric Blueprint',
-  'canvas.hint3d': 'Drag to Orbit 3D ({yaw}° / {pitch}°)',
+  'canvas.hint3d': 'Drag empty space to orbit · drag an object to move it · scroll to zoom',
+  'canvas.3d.aria': '3D view of the room. Drag empty space to orbit, drag an object to move it.',
   'canvas.resetView': 'Reset view',
+  'canvas.3d.loading': 'Loading the 3D view…',
   'canvas.hint2d': 'Drag to Move · 90° Rotate',
   'canvas.shell': '±cm Uncertainty Shell',
   'canvas.relationEdges': 'Relation Edges',
@@ -332,8 +334,10 @@ const ko: Record<TranslationKey, string> = {
 
   'canvas.mode3d': '3D 인식 볼륨',
   'canvas.mode2d': '2D 미터법 도면',
-  'canvas.hint3d': '드래그로 3D 회전 ({yaw}° / {pitch}°)',
+  'canvas.hint3d': '빈 곳을 드래그해 회전 · 객체를 드래그해 이동 · 스크롤로 확대/축소',
+  'canvas.3d.aria': '방의 3D 보기. 빈 곳을 드래그하면 회전하고 객체를 드래그하면 이동합니다.',
   'canvas.resetView': '시점 초기화',
+  'canvas.3d.loading': '3D 보기를 불러오는 중…',
   'canvas.hint2d': '드래그로 이동 · 90° 회전',
   'canvas.shell': '±cm 불확실성 쉘',
   'canvas.relationEdges': '관계 에지',

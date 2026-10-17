@@ -61,6 +61,43 @@
     @apply inline-flex items-center gap-1.5 rounded-md border border-slate-700/70 bg-slate-950/40 px-2 py-1 font-mono text-[10px] text-slate-400;
   }
 }
+
+/* Floating tags in the 3D view (DOM overlays created by the 3D scene). */
+.rc-label {
+  font: 500 10px/1 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #e6edf5;
+  background: rgba(11, 16, 23, 0.86);
+  border: 1px solid rgba(142, 160, 181, 0.45);
+  border-radius: 6px;
+  padding: 3px 6px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.rc-label small {
+  display: none;
+  margin-left: 6px;
+  font-size: 9px;
+  color: #74869c;
+}
+.rc-label[data-selected='true'] small {
+  display: inline;
+}
+.rc-label[data-status='observed'] { border-color: rgba(91, 184, 201, 0.75); }
+.rc-label[data-status='inferred'] { border-color: rgba(251, 191, 36, 0.75); }
+.rc-label[data-status='occluded_prior'] { border-color: rgba(222, 139, 77, 0.75); }
+.rc-label[data-selected='true'] {
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 1px #22d3ee, 0 0 14px rgba(34, 211, 238, 0.35);
+}
+.rc-edge-label {
+  font: 9px/1 'JetBrains Mono', ui-monospace, monospace;
+  color: #a3b5d4;
+  background: rgba(11, 16, 23, 0.7);
+  border-radius: 4px;
+  padding: 1px 4px;
+  pointer-events: none;
+}
+
 /* Custom subtle scrollbars for studio panels */
 ::-webkit-scrollbar {
   width: 6px;

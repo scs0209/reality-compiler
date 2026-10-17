@@ -7,7 +7,7 @@
 Traditional 3D room reconstruction tools generate smooth, texture-baked meshes that **hallucinate over blind spots**—creating false precision right where a baseboard, wall outlet, or occluded mini-fridge will cause a collision on moving day.
 
 **Reality Compiler** provides both:
-1. **3D Epistemic Volumes View**: Renders `Observed` objects as solid metric cuboids while `Inferred` and `Occluded Prior` objects expose their outer `±cm` wireframe uncertainty shells in 3D orbit space.
+1. **3D Epistemic Volumes View** (Three.js): a shaded clay room with simple procedural furniture models. `Observed` objects are solid, `Inferred` ones are see-through and `Occluded Prior` ones are ghosts, each with a status-coloured bounding box and an optional `±cm` uncertainty shell. Drag empty space to orbit, scroll to zoom, and drag an object across the floor to move it.
 2. **2D Metric Blueprint View**: Allows drag-and-drop placement, `90°` rotation, and What-If furniture injection with real-time `UNCERTAINTY_OVERFLOW` and `DOOR_BOTTLENECK` constraint checking.
 
 ## Architecture & Partner Stack (Hacktoberfest Week 2)
