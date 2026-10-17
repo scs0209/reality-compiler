@@ -134,14 +134,13 @@ export const CompileTelemetrySchema = z.object({
   compileId: z.string(),
   timestamp: z.string(),
   model: z.string(),
-  // ollama-gemma3:4b / digitalocean-gradient-gemma3: graph came from a Gemma response.
+  // ollama-<tag> / digitalocean-gradient-gemma3: graph came from a Gemma response. The Ollama form
+  //   names the model that really answered (ollama-gemma3:4b, ollama-gemma4:e4b, ...).
   // fallback-preset: Gemma failed; the graph is a bundled sample NOT derived from the photo.
   // preset-sample: hand-authored sample room; no compile was run.
-  runtime: z.enum([
-    'ollama-gemma3:4b',
-    'digitalocean-gradient-gemma3',
-    'fallback-preset',
-    'preset-sample',
+  runtime: z.union([
+    z.enum(['digitalocean-gradient-gemma3', 'fallback-preset', 'preset-sample']),
+    z.string().regex(/^ollama-[A-Za-z0-9._:\/-]+$/),
   ]),
   fallback: z.object({ stage: FallbackStageSchema, reason: z.string() }).optional(),
   latencyMs: z.number().nonnegative(),

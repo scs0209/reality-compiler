@@ -419,7 +419,8 @@ export async function compileRoomPhoto(input: CompileRoomInput): Promise<{
           compileMeta: {
             ...baseMeta,
             model: run.model,
-            runtime: 'ollama-gemma3:4b',
+            // The model that really answered, so a GEMMA_MODEL override is not labelled gemma3:4b.
+            runtime: `ollama-${run.model}`,
             latencyMs: 0,
             spans: trace.spans,
           },

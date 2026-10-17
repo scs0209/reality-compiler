@@ -103,6 +103,7 @@ const chatReply = (content: string, prompt = 1234, completion = 567) =>
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe('parseGemmaScene', () => {
@@ -341,6 +342,30 @@ describe('compileRoomPhoto', () => {
     expect(objectProps.required).not.toContain('bbox2d');
     expect(request.body.messages[0].content).not.toMatch(/bbox/i);
     expect(roomGraph.nodes.every((n) => n.bbox2d === null)).toBe(true);
+  });
+
+  it('labels the runtime with the model that answered instead of a fixed gemma3 name', async () => {
+    // Seen when GEMMA_MODEL=gemma4:e4b: the graph, the UI and the Sentry trace said gemma3:4b.
+    vi.stubEnv('GEMMA_MODEL', 'gemma4:e4b');
+    const ollama = stubOllama({
+      tags: { models: [{ name: 'gemma4:e4b' }] },
+      chat: () =>
+        new Response(
+          JSON.stringify({
+            model: 'gemma4:e4b',
+            message: { content: JSON.stringify(validScene()) },
+            prompt_eval_count: 10,
+            eval_count: 20,
+          }),
+          { status: 200 }
+        ),
+    });
+
+    const { roomGraph } = await compileRoomPhoto({ photoDataUrl: PNG_1X1, fileName: 'a.png' });
+
+    expect(ollama.chatCalls()[0].body.model).toBe('gemma4:e4b');
+    expect(roomGraph.compileMeta.model).toBe('gemma4:e4b');
+    expect(roomGraph.compileMeta.runtime).toBe('ollama-gemma4:e4b');
   });
 
   it('accepts a first answer with the ceiling height in millimetres, without a second attempt', async () => {
