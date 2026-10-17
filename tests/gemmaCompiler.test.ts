@@ -4,7 +4,12 @@ import { PRESET_ROOMS } from '../shared/presetRooms';
 import { getRoomGraphById } from '../server/atlasStore';
 import { compileRoomPhoto } from '../server/gemmaCompiler';
 import { getSentryStatus } from '../server/sentryAgentTracer';
-import { assembleRoomGraph, fitFootprintIntoRoom, parseGemmaScene } from '../server/gemmaScene';
+import {
+  assembleRoomGraph,
+  fitFootprintIntoRoom,
+  normalizeCeilingHeightCm,
+  parseGemmaScene,
+} from '../server/gemmaScene';
 
 const PNG_1X1 =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
@@ -227,6 +232,39 @@ describe('parseGemmaScene', () => {
     ]);
   });
 
+  it('corrects a ceiling height written in millimetres or out of range instead of rejecting the answer', () => {
+    const withCeiling = (ceilingHeightCm: number) =>
+      parseGemmaScene({ ...validScene(), room: { ...validScene().room, ceilingHeightCm } });
+
+    // gemma3:4b wrote 2700 and 2400 for 270 cm and 240 cm ceilings; this used to fail validation.
+    const mm = withCeiling(2700);
+    expect(mm.scene.room.ceilingHeightCm).toBe(270);
+    expect(mm.stats.ceilingHeightAdjusted).toBe(1);
+    expect(mm.stats.ceilingHeightNote).toBe('2700 read as mm = 270 cm');
+    expect(mm.stats.fieldsNormalized).toBe(1);
+
+    expect(withCeiling(700).scene.room.ceilingHeightCm).toBe(600); // not a plausible mm value: clamped
+    expect(withCeiling(700).stats.ceilingHeightNote).toBe('700 clamped to 600 cm');
+    expect(withCeiling(90).scene.room.ceilingHeightCm).toBe(180);
+    expect(withCeiling(12000).scene.room.ceilingHeightCm).toBe(600);
+
+    const fine = withCeiling(235);
+    expect(fine.scene.room.ceilingHeightCm).toBe(235);
+    expect(fine.stats.ceilingHeightAdjusted).toBe(0);
+    expect(fine.stats.ceilingHeightNote).toBeNull();
+    expect(fine.stats.fieldsNormalized).toBe(0);
+  });
+
+  it('draws the line between millimetres and out-of-range centimetres at 1800 and 6000', () => {
+    expect(normalizeCeilingHeightCm(1800)).toEqual({ valueCm: 180, note: '1800 read as mm = 180 cm' });
+    expect(normalizeCeilingHeightCm(6000)).toEqual({ valueCm: 600, note: '6000 read as mm = 600 cm' });
+    expect(normalizeCeilingHeightCm(1799).valueCm).toBe(600);
+    expect(normalizeCeilingHeightCm(6001).valueCm).toBe(600);
+    expect(normalizeCeilingHeightCm(180)).toEqual({ valueCm: 180, note: null });
+    expect(normalizeCeilingHeightCm(600)).toEqual({ valueCm: 600, note: null });
+    expect(normalizeCeilingHeightCm(-5).valueCm).toBe(180);
+  });
+
   it('rejects an answer with no usable objects or no room', () => {
     expect(() => parseGemmaScene({ ...validScene(), objects: [{ label: 'x' }] })).toThrow(
       /no usable objects/
@@ -303,6 +341,23 @@ describe('compileRoomPhoto', () => {
     expect(objectProps.required).not.toContain('bbox2d');
     expect(request.body.messages[0].content).not.toMatch(/bbox/i);
     expect(roomGraph.nodes.every((n) => n.bbox2d === null)).toBe(true);
+  });
+
+  it('accepts a first answer with the ceiling height in millimetres, without a second attempt', async () => {
+    const scene = validScene();
+    scene.room.ceilingHeightCm = 2700;
+    const ollama = stubOllama({ chat: () => chatReply(JSON.stringify(scene)) });
+
+    const { roomGraph, ollamaLiveUsed } = await compileRoomPhoto({ photoDataUrl: PNG_1X1, fileName: 'a.png' });
+
+    expect(ollamaLiveUsed).toBe(true);
+    expect(ollama.chatCalls()).toHaveLength(1);
+    expect(roomGraph.roomEnvelope.ceilingHeightCm).toBe(270);
+    const assemble = roomGraph.compileMeta.spans.filter((s) => s.op === 'compiler.assemble');
+    expect(assemble).toHaveLength(1);
+    expect(assemble[0].status).toBe('ok');
+    expect(assemble[0].attributes['gemma.ceiling_height_adjusted']).toBe(1);
+    expect(assemble[0].attributes['gemma.ceiling_height_note']).toBe('2700 read as mm = 270 cm');
   });
 
   it('retries once with the validation error and records each attempt as its own span', async () => {

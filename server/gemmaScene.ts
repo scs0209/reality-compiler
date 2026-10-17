@@ -29,7 +29,9 @@ const num = z.number().finite();
 const GemmaRoomSchema = z.object({
   widthCm: num.min(100).max(3000),
   depthCm: num.min(100).max(3000),
-  ceilingHeightCm: num.min(180).max(600),
+  // Range-checked in normalizeCeilingHeightCm rather than here: gemma3:4b often writes it in
+  // millimetres (2700), and rejecting the whole answer for that cost a full second attempt.
+  ceilingHeightCm: num,
   uncertaintyCm: num.nonnegative().max(500),
   scaleConfidence: num,
   perspectiveTiltDeg: num,
@@ -119,6 +121,29 @@ export interface GemmaParseStats {
   droppedReasons: string[];
   // Objects left out because they are not floor-standing (see notOnFloorReason), first few only.
   skippedNotOnFloor: string[];
+  // 1 when the ceiling height the model gave was outside 180-600 cm and was corrected, else 0.
+  ceilingHeightAdjusted: number;
+  // What was corrected, e.g. "2700 read as mm = 270 cm"; null when nothing was.
+  ceilingHeightNote: string | null;
+}
+
+const CEILING_MIN_CM = 180;
+const CEILING_MAX_CM = 600;
+
+/**
+ * Brings the model's ceiling height into 180-600 cm. A value of 1800-6000 is read as millimetres
+ * (the 4B model writes 2700 for a 270 cm ceiling); anything else out of range is clamped. The
+ * height only sizes the walls in the views, so a corrected value is better than a rejected answer.
+ */
+export function normalizeCeilingHeightCm(reported: number): { valueCm: number; note: string | null } {
+  const inMillimetres = reported >= CEILING_MIN_CM * 10 && reported <= CEILING_MAX_CM * 10;
+  const cm = inMillimetres ? reported / 10 : reported;
+  const valueCm = Math.round(Math.min(CEILING_MAX_CM, Math.max(CEILING_MIN_CM, cm)));
+  if (valueCm === reported) return { valueCm, note: null };
+  return {
+    valueCm,
+    note: inMillimetres ? `${reported} read as mm = ${valueCm} cm` : `${reported} clamped to ${valueCm} cm`,
+  };
 }
 
 // Windows and doors belong in `openings`; curtains and wall art hang on a wall; pillows and books
@@ -196,7 +221,17 @@ export function parseGemmaScene(raw: unknown): { scene: GemmaScene; stats: Gemma
     confidenceCapped: 0,
     droppedReasons: [],
     skippedNotOnFloor: [],
+    ceilingHeightAdjusted: 0,
+    ceilingHeightNote: null,
   };
+
+  const ceiling = normalizeCeilingHeightCm(envelope.data.room.ceilingHeightCm);
+  if (ceiling.note) {
+    stats.ceilingHeightAdjusted = 1;
+    stats.ceilingHeightNote = ceiling.note;
+    stats.fieldsNormalized += 1;
+  }
+  const room = { ...envelope.data.room, ceilingHeightCm: ceiling.valueCm };
   const reject = (index: number, why: string) => {
     if (stats.droppedReasons.length < 3) stats.droppedReasons.push(`objects[${index}] ${why}`);
   };
@@ -219,7 +254,7 @@ export function parseGemmaScene(raw: unknown): { scene: GemmaScene; stats: Gemma
     // A footprint that leaves the room the model just described is impossible. Pull it back inside
     // and stop calling it an observation: its position is a guess now.
     let fitted: GemmaObject = o;
-    const fit = fitFootprintIntoRoom(o.footprint, envelope.data.room);
+    const fit = fitFootprintIntoRoom(o.footprint, room);
     if (fit) {
       stats.outOfRoom += 1;
       stats.repairedIntoRoom += 1;
@@ -268,7 +303,7 @@ export function parseGemmaScene(raw: unknown): { scene: GemmaScene; stats: Gemma
     if (parsed.success) blindSpots.push(parsed.data);
   }
 
-  return { scene: { room: envelope.data.room, objects, openings, blindSpots }, stats };
+  return { scene: { room, objects, openings, blindSpots }, stats };
 }
 
 function summarizeZodError(err: z.ZodError, maxIssues = 4): string {

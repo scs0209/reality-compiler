@@ -343,6 +343,8 @@ async function runGemma(
             ...(stats.droppedReasons.length > 0 && {
               'gemma.dropped_reasons': stats.droppedReasons.join(' | ').slice(0, 300),
             }),
+            'gemma.ceiling_height_adjusted': stats.ceilingHeightAdjusted,
+            ...(stats.ceilingHeightNote && { 'gemma.ceiling_height_note': stats.ceilingHeightNote }),
             'gemma.objects_skipped_not_on_floor': stats.skippedNotOnFloor.length,
             ...(stats.skippedNotOnFloor.length > 0 && {
               'gemma.skipped_not_on_floor': stats.skippedNotOnFloor.join(' | ').slice(0, 300),
