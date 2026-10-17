@@ -40,11 +40,29 @@ The moving quote in [shared/spatialEngine.ts](shared/spatialEngine.ts) is a **ha
 
 ## Quick Start
 
+You need Node 20+ and [Ollama](https://ollama.com). The Gemma model is downloaded separately and is under its own terms (see [License](#license)).
+
 ```bash
 npm install
+ollama pull gemma3:4b
 npm run dev
 ```
 
 - Web Studio UI: `http://127.0.0.1:5173`
 - Compiler API Health: `http://127.0.0.1:8787/api/health`
 - Verification: `npm run typecheck && npm test && npm run build`
+
+## License
+
+The code in this repository is released under the [MIT License](LICENSE). Third-party dependencies keep their own licenses.
+
+### Gemma is licensed separately
+
+This repository contains **no model weights**. Reality Compiler calls `gemma3:4b` through Ollama, and you download that model yourself with `ollama pull gemma3:4b`. The weights are **not** covered by the MIT License. They are provided by Google under the [Gemma Terms of Use](https://ai.google.dev/gemma/terms) and its Prohibited Use Policy, and those terms apply to everyone who uses them.
+
+- **Using Gemma** means accepting those terms, including the Prohibited Use Policy.
+- **Distributing Gemma** (or models derived from it) means passing the use restrictions on to recipients and giving them a copy of the terms. The terms count making Gemma available as a hosted service over an API as distribution, so check them before running a public deployment backed by a Gemma server.
+- **Other models:** the Gemma Terms of Use cover the Gemma 1, 2, 3 and 3n families, and Gemma 4 has its own license. If you point `GEMMA_MODEL` at a different model, check that model's license.
+- **Outputs:** Google states that it claims no rights in what Gemma generates.
+
+This is a summary of public text as of 2026-10-17, not legal advice. Read the current terms before relying on it.

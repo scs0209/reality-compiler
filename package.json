@@ -2,6 +2,7 @@
   "name": "reality-compiler",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "Reality Compiler — Compiles room photos into executable RoomGraph JSON with epistemic uncertainty (Observed vs Inferred), spatial relations, top-down 2D simulation, and moving What-If verification.",
   "scripts": {

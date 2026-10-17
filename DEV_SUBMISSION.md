@@ -9,7 +9,8 @@ BEFORE YOU PUBLISH. This comment is not rendered on DEV; delete it when you are 
 
 Not verified yet, so the post does not claim any of it:
 1. Code link: the repo has no git remote yet. Push it and add the URL under "Code".
-   There is also no LICENSE file; the challenge is about open models and the "opensource" tag implies an open repo.
+   The repo now has an MIT LICENSE (copyright scs0209). Push only the feature branch: a local entire/* branch
+   created by Entire also contains HANDOFF.md.
 2. Live demo: nothing is deployed that I could check. Add a URL only after opening it yourself.
    Add screenshots or a short video of real runs under "Demo".
 3. Real photos: every successful run so far used a diagram image, not a photograph. Run 3 to 5 real room
@@ -78,7 +79,7 @@ If Gemma can't produce a usable answer, the app does not pretend. It shows a bun
 
 ## Code
 
-Stack: TypeScript, React, Vite, Tailwind, Express, Zod, Vitest, Ollama.
+Stack: TypeScript, React, Vite, Tailwind, Express, Zod, Vitest, Ollama. The code is MIT-licensed; Gemma is not part of the repo and stays under Google's Gemma Terms of Use.
 
 - `shared/roomGraphSchema.ts`: the `roomgraph.v1.2` schema.
 - `server/gemmaCompiler.ts`: the Ollama call, the retry, and the fallback.
