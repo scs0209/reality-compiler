@@ -13,8 +13,9 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { ObjectCategory, RoomGraph, RoomObjectNode } from '../../shared/roomGraphSchema';
-import { EVIDENCE_STYLE } from '../evidenceStyle';
+import { EVIDENCE_STYLE, boxesAreModelEstimates } from '../evidenceStyle';
 import { epistemicBadgeKey, nodeLabel, useI18n } from '../i18n';
+import { useImageAspect } from '../imageUtils';
 
 interface SceneInspectorProps {
   graph: RoomGraph;
@@ -60,6 +61,7 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
 }) => {
   const { t, lang } = useI18n();
   const [tab, setTab] = useState<Tab>('props');
+  const photoAspect = useImageAspect(graph.sourcePhotoUrl);
 
   const relations = useMemo(
     () =>
@@ -251,16 +253,16 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
             <div className="section-title mb-1.5">{t('insp.evidence.region')}</div>
             {box ? (
               <div className="flex flex-col gap-1.5">
-                {/* Crop of the source photo around the object's box. The overlay on the photo
-                    panel assumes a 16:10 frame, so the crop does too. */}
+                {/* Crop of the source photo around the object's box. The photo is laid out in its
+                    own aspect ratio (the same frame the overlay panel uses), so the crop is exact. */}
                 <div
                   className="relative w-full max-w-[16rem] overflow-hidden rounded-md border border-slate-700 bg-slate-950"
-                  style={{ aspectRatio: `${box.w * 16} / ${box.h * 10}` }}
+                  style={{ aspectRatio: `${box.w * photoAspect} / ${box.h}` }}
                 >
                   <img
                     src={graph.sourcePhotoUrl}
                     alt=""
-                    className="absolute max-w-none object-cover"
+                    className="absolute max-w-none object-fill"
                     style={{
                       width: `${100 / box.w}%`,
                       height: `${100 / box.h}%`,
@@ -277,6 +279,9 @@ export const SceneInspector: React.FC<SceneInspectorProps> = ({
                     h: Math.round(box.h * 100),
                   })}
                 </span>
+                {boxesAreModelEstimates(graph) && (
+                  <span className="text-[10px] leading-snug text-amber-300/90">{t('evidence.boxesApprox')}</span>
+                )}
               </div>
             ) : (
               <p className="text-[11px] leading-snug text-slate-400">{t('insp.evidence.noRegion')}</p>

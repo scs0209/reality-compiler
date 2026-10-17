@@ -7,7 +7,6 @@ import {
   Database,
   Activity,
   FileCode2,
-  GitBranch,
   Cpu,
 } from 'lucide-react';
 import { useI18n } from '../i18n';
@@ -44,7 +43,7 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
   savingAtlas,
 }) => {
   const { t } = useI18n();
-  const [subTab, setSubTab] = useState<'json' | 'sentry' | 'atlas' | 'entire'>('json');
+  const [subTab, setSubTab] = useState<'json' | 'sentry' | 'atlas'>('json');
   const [copied, setCopied] = useState(false);
 
   const jsonText = JSON.stringify(graph, null, 2);
@@ -125,18 +124,6 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
           >
             <Database className="w-3.5 h-3.5" />
             {t('partner.tab.atlas', { n: atlasGraphs.length })}
-          </button>
-          <button
-            type="button"
-            onClick={() => setSubTab('entire')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-medium transition ${
-              subTab === 'entire'
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <GitBranch className="w-3.5 h-3.5" />
-            {t('partner.tab.entire')}
           </button>
         </div>
       </div>
@@ -364,31 +351,6 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
                 </span>
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Tab 4: Entire CLI & DevRelay Agent Session Rationale */}
-      {subTab === 'entire' && (
-        <div className="p-3.5 flex flex-col gap-2.5 text-xs">
-          <div className="p-2.5 rounded-lg bg-amber-950/25 border border-amber-500/30 text-amber-200">
-            <div className="font-semibold">{t('partner.entire.title')}</div>
-            <p className="text-[11px] opacity-85 mt-0.5">{t('partner.entire.body')}</p>
-          </div>
-
-          <div className="space-y-2 font-mono text-[11px] text-slate-300 bg-slate-950 p-3 rounded-lg border border-slate-800">
-            <div>
-              <span className="text-amber-400">{t('partner.entire.cp1.label')}</span>{' '}
-              {t('partner.entire.cp1.body')}
-            </div>
-            <div>
-              <span className="text-sky-400">{t('partner.entire.cp2.label')}</span>{' '}
-              {t('partner.entire.cp2.body')}
-            </div>
-            <div>
-              <span className="text-emerald-400">{t('partner.entire.cp3.label')}</span>{' '}
-              {t('partner.entire.cp3.body')}
-            </div>
           </div>
         </div>
       )}

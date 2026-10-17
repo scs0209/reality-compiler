@@ -10,7 +10,6 @@ const en = {
   'app.pill.sentry': 'Sentry Agent Tracing',
   'app.pill.sentryOff': 'Sentry: not sending',
   'app.pill.sentryUnknown': 'Sentry: status unknown',
-  'app.pill.entire': 'Entire CLI Tracked',
   'kpi.objects': 'Objects detected',
   'kpi.relations': 'Spatial relationships',
   'kpi.relations.none': 'no relations in this graph',
@@ -66,7 +65,8 @@ const en = {
   'insp.evidence.source': 'Evidence source',
   'insp.evidence.region': 'Source region',
   'insp.evidence.box': 'Box: x {x}%, y {y}%, {w}% × {h}%',
-  'insp.evidence.noRegion': 'No photo region for this object: it was added for the what-if, or the model gave no usable box.',
+  'insp.evidence.noRegion':
+    'No photo region for this object: the vision model is not asked to locate objects in the photo (it does so unreliably), and what-if items are not in it.',
   'app.lang.toggle': '한국어',
   'app.section.evidence': 'Photo or sample room',
   'app.btn.upload': 'Upload Photo',
@@ -184,7 +184,6 @@ const en = {
   'partner.tab.json': 'RoomGraph JSON',
   'partner.tab.sentry': 'Sentry Trace',
   'partner.tab.atlas': 'MongoDB Atlas ({n})',
-  'partner.tab.entire': 'Entire CLI Session',
   'partner.json.schema': 'Schema: {v} · Nodes: {n} · Edges: {e}',
   'partner.json.copy': 'Copy JSON',
   'partner.json.copied': 'Copied',
@@ -204,26 +203,17 @@ const en = {
   'partner.atlas.upsert': 'Upsert RoomGraph to Atlas',
   'partner.atlas.sceneId': 'sceneId: {id} · {w}×{d}cm · {n} objects',
   'partner.atlas.load': 'Load Scene',
-  'partner.entire.title':
-    'Entire CLI Active (`.entire/settings.json` + `entire-session/devrelay-session.json`)',
-  'partner.entire.body':
-    'Git hooks and checkpoints are tracked via Entire CLI (`entire status` / `entire checkpoint list`), documenting why we built epistemic 3D/2D uncertainty volumes instead of hallucinated photogrammetry meshes.',
-  'partner.entire.cp1.label': '[Checkpoint #1 — Schema Design]',
-  'partner.entire.cp1.body':
-    'Single-image 3D surface meshes hallucinate over occluded corners and create false precision. We designed roomgraph.v1.2 so every object carries epistemic: observed | inferred | occluded_prior and explicit ±cm error bands.',
-  'partner.entire.cp2.label': '[Checkpoint #2 — Gemma 3 Vision Prompt]',
-  'partner.entire.cp2.body':
-    'gemma3:4b first calibrates pixel-to-cm scale against a standard door frame (210×82cm) before extracting 2D bboxes, 3D bounding volumes, and blind spots.',
-  'partner.entire.cp3.label': '[Checkpoint #3 — 3D Epistemic Volumes & Solver]',
-  'partner.entire.cp3.body':
-    'Added interactive 3D Epistemic Volumes + 2D Blueprint toggle, flagging UNCERTAINTY_OVERFLOW when two items pass nominally (2cm gap) but collide under ±12cm combined uncertainty.',
 
-  'evidence.title': 'Source Evidence Photo (Gemma 3 Vision BBox & Epistemic State)',
+  'evidence.title': 'Source Evidence Photo (Object Boxes & Epistemic State)',
   'evidence.overlay': 'Vision Overlay',
   'evidence.scale': 'Scale Anchor:',
   'evidence.pxcm': 'px/cm:',
   'evidence.tilt': 'Tilt:',
   'evidence.scaleConf': 'Scale Conf:',
+  'evidence.boxesApprox':
+    "These boxes are the vision model's own estimate and often do not line up with the objects. Treat them as rough.",
+  'evidence.noBoxes':
+    'No object boxes for this photo: the vision model is not asked to locate objects in it, because it does so unreliably. Positions on the floor plan are estimates as well.',
 };
 
 export type TranslationKey = keyof typeof en;
@@ -236,7 +226,6 @@ const ko: Record<TranslationKey, string> = {
   'app.pill.sentry': 'Sentry 에이전트 트레이싱',
   'app.pill.sentryOff': 'Sentry: 전송 안 함',
   'app.pill.sentryUnknown': 'Sentry: 상태 알 수 없음',
-  'app.pill.entire': 'Entire CLI 추적 중',
   'kpi.objects': '감지된 객체',
   'kpi.relations': '공간 관계',
   'kpi.relations.none': '이 그래프에는 관계가 없습니다',
@@ -292,7 +281,8 @@ const ko: Record<TranslationKey, string> = {
   'insp.evidence.source': '증거 출처',
   'insp.evidence.region': '사진 속 위치',
   'insp.evidence.box': '박스: x {x}%, y {y}%, {w}% × {h}%',
-  'insp.evidence.noRegion': '이 객체는 사진 속 위치가 없습니다: what-if로 추가했거나 모델이 쓸 수 있는 박스를 주지 않았습니다.',
+  'insp.evidence.noRegion':
+    '이 객체는 사진 속 위치가 없습니다. 비전 모델에게 사진 속 위치를 묻지 않으며(정확하지 않기 때문입니다), what-if로 추가한 객체는 사진에 없습니다.',
   'app.lang.toggle': 'English',
   'app.section.evidence': '사진 또는 샘플 방',
   'app.btn.upload': '사진 업로드',
@@ -409,7 +399,6 @@ const ko: Record<TranslationKey, string> = {
   'partner.tab.json': 'RoomGraph JSON',
   'partner.tab.sentry': 'Sentry 트레이스',
   'partner.tab.atlas': 'MongoDB Atlas ({n})',
-  'partner.tab.entire': 'Entire CLI 세션',
   'partner.json.schema': '스키마: {v} · 노드: {n} · 엣지: {e}',
   'partner.json.copy': 'JSON 복사',
   'partner.json.copied': '복사됨',
@@ -428,26 +417,17 @@ const ko: Record<TranslationKey, string> = {
   'partner.atlas.upsert': 'RoomGraph를 Atlas에 저장',
   'partner.atlas.sceneId': 'sceneId: {id} · {w}×{d}cm · 객체 {n}개',
   'partner.atlas.load': '씬 불러오기',
-  'partner.entire.title':
-    'Entire CLI 활성화됨 (`.entire/settings.json` + `entire-session/devrelay-session.json`)',
-  'partner.entire.body':
-    'Git 훅과 체크포인트는 Entire CLI로 추적합니다 (`entire status` / `entire checkpoint list`). 환각이 생기기 쉬운 포토그래메트리 메시 대신 인식 불확실성 3D/2D 볼륨을 만든 이유를 기록합니다.',
-  'partner.entire.cp1.label': '[체크포인트 #1 — 스키마 설계]',
-  'partner.entire.cp1.body':
-    '단일 이미지 3D 표면 메시는 가려진 모서리를 환각으로 채우고 잘못된 정밀도를 만듭니다. 그래서 모든 객체가 epistemic: observed | inferred | occluded_prior와 명시적 ±cm 오차 범위를 갖도록 roomgraph.v1.2를 설계했습니다.',
-  'partner.entire.cp2.label': '[체크포인트 #2 — Gemma 3 비전 프롬프트]',
-  'partner.entire.cp2.body':
-    'gemma3:4b가 먼저 표준 문틀(210×82cm)로 픽셀-cm 축척을 보정한 뒤 2D bbox, 3D 바운딩 볼륨, 사각지대를 추출합니다.',
-  'partner.entire.cp3.label': '[체크포인트 #3 — 3D 인식 볼륨 & 솔버]',
-  'partner.entire.cp3.body':
-    '인터랙티브 3D 인식 볼륨과 2D 도면 토글을 추가했습니다. 두 객체가 명목상 통과(2cm 간격)하지만 합산 ±12cm 불확실성에서 충돌하면 UNCERTAINTY_OVERFLOW를 표시합니다.',
 
-  'evidence.title': '원본 근거 사진 (Gemma 3 비전 BBox & 인식 상태)',
+  'evidence.title': '원본 근거 사진 (객체 박스 & 인식 상태)',
   'evidence.overlay': '비전 오버레이',
   'evidence.scale': '축척 기준:',
   'evidence.pxcm': 'px/cm:',
   'evidence.tilt': '기울기:',
   'evidence.scaleConf': '축척 신뢰도:',
+  'evidence.boxesApprox':
+    '이 박스는 비전 모델이 추정한 값이라 실제 물체와 어긋나는 경우가 많습니다. 대략적인 참고용으로만 보세요.',
+  'evidence.noBoxes':
+    '이 사진에는 객체 박스가 없습니다. 비전 모델은 사진 속 위치를 정확히 짚지 못해서 묻지 않습니다. 평면도의 위치도 추정값입니다.',
 };
 
 const dictionaries: Record<Lang, Record<TranslationKey, string>> = { en, ko };

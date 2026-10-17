@@ -1,8 +1,13 @@
 import React from 'react';
 import type { RoomGraph, RoomObjectNode } from '../../shared/roomGraphSchema';
-import { Eye, Sparkles, Compass } from 'lucide-react';
+import { AlertTriangle, Compass, Eye, Info, Sparkles } from 'lucide-react';
+import { boxesAreModelEstimates } from '../evidenceStyle';
 import { useI18n, nodeLabel } from '../i18n';
+import { useImageAspect } from '../imageUtils';
 import { ToggleChip } from './ToggleChip';
+
+// A tall photo is limited to this share of the viewport height; the frame narrows to keep its ratio.
+const MAX_PHOTO_HEIGHT_VH = 70;
 
 interface EvidencePhotoPanelProps {
   graph: RoomGraph;
@@ -20,6 +25,10 @@ export const EvidencePhotoPanel: React.FC<EvidencePhotoPanelProps> = ({
   onToggleBBoxOverlay,
 }) => {
   const { t, lang } = useI18n();
+  const aspect = useImageAspect(graph.sourcePhotoUrl);
+  // A compiled photo has no boxes at all (the model is not asked for them); only samples do.
+  const hasBoxes = graph.nodes.some((n) => n.bbox2d);
+  const modelBoxes = hasBoxes && boxesAreModelEstimates(graph);
   const badgeColor = (epistemic: RoomObjectNode['epistemic']) => {
     if (epistemic === 'observed') {
       return 'border-emerald-400 bg-emerald-500/20 text-emerald-200';
@@ -39,18 +48,39 @@ export const EvidencePhotoPanel: React.FC<EvidencePhotoPanelProps> = ({
             {t('evidence.title')}
           </span>
         </div>
-        <ToggleChip on={showBBoxOverlay} onClick={onToggleBBoxOverlay}>
-          <Eye className="h-3.5 w-3.5" />
-          {t('evidence.overlay')}
-        </ToggleChip>
+        {hasBoxes && (
+          <ToggleChip on={showBBoxOverlay} onClick={onToggleBBoxOverlay}>
+            <Eye className="h-3.5 w-3.5" />
+            {t('evidence.overlay')}
+          </ToggleChip>
+        )}
       </div>
 
-      {/* Image Container with Normalized BBox Overlay */}
-      <div className="relative w-full aspect-[16/10] bg-slate-950 overflow-hidden">
+      {!hasBoxes && (
+        <div className="flex items-start gap-2 border-b border-slate-800 px-3.5 py-2 text-[11px] leading-snug text-slate-400">
+          <Info className="mt-px h-3.5 w-3.5 shrink-0" />
+          {t('evidence.noBoxes')}
+        </div>
+      )}
+
+      {modelBoxes && (
+        <div className="flex items-start gap-2 border-b border-slate-800 bg-amber-500/5 px-3.5 py-2 text-[11px] leading-snug text-amber-300/90">
+          <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
+          {t('evidence.boxesApprox')}
+        </div>
+      )}
+
+      {/* The frame takes the photo's own aspect ratio, so the normalized boxes line up with it
+          (cropping a portrait photo into a wide frame would shift every box). */}
+      <div className="bg-slate-950">
+        <div
+          className="relative mx-auto overflow-hidden"
+          style={{ aspectRatio: String(aspect), width: `min(100%, ${(MAX_PHOTO_HEIGHT_VH * aspect).toFixed(1)}vh)` }}
+        >
         <img
           src={graph.sourcePhotoUrl}
           alt={graph.title}
-          className="w-full h-full object-cover"
+          className="h-full w-full object-fill"
         />
 
         {showBBoxOverlay &&
@@ -92,6 +122,7 @@ export const EvidencePhotoPanel: React.FC<EvidencePhotoPanelProps> = ({
               </div>
             );
           })}
+        </div>
       </div>
 
       {/* Calibration Anchor Summary */}

@@ -10,6 +10,7 @@ import { KpiStrip } from './components/KpiStrip';
 import { EvidenceSidebar } from './components/EvidenceSidebar';
 import { SceneInspector } from './components/SceneInspector';
 import { useI18n, nodeLabel, presetCopy } from './i18n';
+import { boxesAreModelEstimates } from './evidenceStyle';
 import { downscaleImageDataUrl } from './imageUtils';
 import {
   AlertTriangle,
@@ -85,6 +86,8 @@ export function App() {
       setDoorWidthOverrideCm(entryDoor.widthCm);
     }
     setSelectedNodeId(nextGraph.nodes[0]?.id || null);
+    // Boxes the model drew itself are often wrong; start with them hidden (the toggle still works).
+    setShowBBoxOverlay(!boxesAreModelEstimates(nextGraph));
   };
 
   const refreshStatus = () => {
@@ -451,9 +454,6 @@ export function App() {
                   ? t('app.pill.sentry')
                   : t('app.pill.sentryOff')}
             </span>
-            <span className="chip hidden 2xl:inline-flex">DigitalOcean</span>
-            <span className="chip hidden 2xl:inline-flex">realitycompiler.tech</span>
-            <span className="chip hidden 2xl:inline-flex">{t('app.pill.entire')}</span>
             <button type="button" onClick={toggleLang} className="btn-secondary">
               {t('app.lang.toggle')}
             </button>

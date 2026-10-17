@@ -1,4 +1,32 @@
+import { useEffect, useState } from 'react';
+
 const MAX_DIMENSION_PX = 1280;
+
+// Used until the photo has loaded (and for images the browser reports no size for).
+const DEFAULT_PHOTO_ASPECT = 16 / 10;
+
+/**
+ * Width / height of a photo, so the evidence overlay and the object crops can be laid out in the
+ * photo's own frame. Box coordinates are fractions of the whole photo; drawing them on a frame
+ * with another aspect ratio (or on a cropped image) puts them in the wrong place.
+ */
+export function useImageAspect(src: string): number {
+  const [aspect, setAspect] = useState(DEFAULT_PHOTO_ASPECT);
+  useEffect(() => {
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (!cancelled && img.naturalWidth > 0 && img.naturalHeight > 0) {
+        setAspect(img.naturalWidth / img.naturalHeight);
+      }
+    };
+    img.src = src;
+    return () => {
+      cancelled = true;
+    };
+  }, [src]);
+  return aspect;
+}
 
 /**
  * Shrinks a photo before upload: phone photos can exceed the API body limit, and the vision model

@@ -1,4 +1,11 @@
-import type { EpistemicStatus } from '../shared/roomGraphSchema';
+import type { EpistemicStatus, RoomGraph } from '../shared/roomGraphSchema';
+
+// The photo boxes of a compiled graph are the vision model's own guess. The small local model
+// often places them far from the object, so the UI hides them by default and says they are rough.
+// Boxes of the bundled samples are hand-authored and can be trusted.
+export const boxesAreModelEstimates = (graph: Pick<RoomGraph, 'compileMeta'>): boolean =>
+  graph.compileMeta.runtime === 'ollama-gemma3:4b' ||
+  graph.compileMeta.runtime === 'digitalocean-gradient-gemma3';
 
 // One place for the evidence colour language: observed = muted cyan, estimated = amber,
 // low-confidence = muted orange. Errors use rose and are not part of this map.
