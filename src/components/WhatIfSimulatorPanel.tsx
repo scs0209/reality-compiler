@@ -1,5 +1,6 @@
 import React from 'react';
 import type { MovingWhatIfReport, RoomGraph } from '../../shared/roomGraphSchema';
+import { useI18n } from '../i18n';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -30,6 +31,7 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
   onSelectNode,
   onResetLayout,
 }) => {
+  const { t, lang } = useI18n();
   return (
     <div className="flex flex-col gap-3">
       {/* Top Status Banner */}
@@ -37,15 +39,15 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <div className="text-xs uppercase tracking-wider text-sky-400 font-mono">
-              Downstream #1 · Moving & Layout What-If Verifier
+              {t('whatif.kicker')}
             </div>
             <h3 className="text-sm font-bold text-slate-100 mt-0.5">
-              Move-In & Clearance Feasibility (with ±cm Epistemic Error)
+              {t('whatif.title')}
             </h3>
           </div>
           <div className="flex items-center gap-2">
             <div className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-xs font-mono">
-              Confidence Score:{' '}
+              {t('whatif.score')}{' '}
               <span
                 className={`font-bold ${
                   report.confidenceAdjustedScore >= 80
@@ -63,7 +65,7 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
               onClick={onResetLayout}
               className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700 transition"
             >
-              Reset Layout
+              {t('whatif.reset')}
             </button>
           </div>
         </div>
@@ -84,11 +86,11 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
             )}
             <div className="text-xs">
               <div className="font-semibold">
-                Nominal Geometry:{' '}
-                {report.feasibleNominal ? 'PASS (Fits Cleanly)' : 'BLOCKED (Collision)'}
+                {t('whatif.nominal')}{' '}
+                {report.feasibleNominal ? t('whatif.pass') : t('whatif.blocked')}
               </div>
               <div className="text-[11px] opacity-80 mt-0.5">
-                Evaluated using central Gemma 3 dimensions without error bars
+                {t('whatif.nominalDesc')}
               </div>
             </div>
           </div>
@@ -107,11 +109,11 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
             )}
             <div className="text-xs">
               <div className="font-semibold">
-                Worst-Case (±cm Bounds):{' '}
-                {report.feasibleWorstCase ? 'SAFE MARGIN' : 'UNCERTAINTY COLLISION!'}
+                {t('whatif.worst')}{' '}
+                {report.feasibleWorstCase ? t('whatif.safe') : t('whatif.collision')}
               </div>
               <div className="text-[11px] opacity-80 mt-0.5">
-                Evaluated when Inferred / Occluded ±cm error bands compound
+                {t('whatif.worstDesc')}
               </div>
             </div>
           </div>
@@ -123,7 +125,7 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
             <div className="flex justify-between text-slate-300">
               <span className="flex items-center gap-1">
                 <DoorClosed className="w-3.5 h-3.5 text-sky-400" />
-                Target Entry Door Width
+                {t('whatif.doorWidth')}
               </span>
               <span className="font-mono font-semibold text-sky-300">
                 {doorWidthOverrideCm} cm
@@ -138,9 +140,9 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
               className="w-full accent-sky-500 cursor-pointer"
             />
             <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-              <span>68cm (Walk-up)</span>
-              <span>82cm (Standard)</span>
-              <span>105cm (Wide)</span>
+              <span>{t('whatif.door.walkup')}</span>
+              <span>{t('whatif.door.standard')}</span>
+              <span>{t('whatif.door.wide')}</span>
             </div>
           </div>
 
@@ -148,7 +150,7 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
             <div className="flex justify-between text-slate-300">
               <span className="flex items-center gap-1">
                 <Ruler className="w-3.5 h-3.5 text-indigo-400" />
-                Min Walkway Clearance
+                {t('whatif.walkway')}
               </span>
               <span className="font-mono font-semibold text-indigo-300">
                 {minWalkwayCm} cm
@@ -163,9 +165,9 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
               className="w-full accent-indigo-500 cursor-pointer"
             />
             <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-              <span>40cm (Tight)</span>
-              <span>55cm (Standard)</span>
-              <span>85cm (ADA/Wide)</span>
+              <span>{t('whatif.walk.tight')}</span>
+              <span>{t('whatif.walk.standard')}</span>
+              <span>{t('whatif.walk.ada')}</span>
             </div>
           </div>
         </div>
@@ -175,16 +177,16 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
       <div className="p-3.5 rounded-xl bg-slate-900/95 border border-slate-800 flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-            Detected Constraints & Epistemic Alerts ({report.violations.length})
+            {t('whatif.alerts', { n: report.violations.length })}
           </h4>
-          <span className="text-[11px] text-slate-400">Click to highlight object</span>
+          <span className="text-[11px] text-slate-400">{t('whatif.clickHighlight')}</span>
         </div>
 
         {report.violations.length === 0 ? (
           <div className="p-3 rounded-lg bg-emerald-950/25 border border-emerald-500/30 text-xs text-emerald-300 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 shrink-0" />
             <span>
-              All furniture passes both Nominal geometry and ±cm Epistemic Uncertainty bounds!
+              {t('whatif.allPass')}
             </span>
           </div>
         ) : (
@@ -227,16 +229,16 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
       {/* Door Bottleneck Matrix */}
       <div className="p-3.5 rounded-xl bg-slate-900/95 border border-slate-800 flex flex-col gap-2">
         <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-          Doorway ({doorWidthOverrideCm}cm) Pass-Through Matrix
+          {t('whatif.matrix', { w: doorWidthOverrideCm })}
         </h4>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-slate-800 text-slate-400 font-mono text-[11px]">
-                <th className="py-1.5 pr-2">Object</th>
-                <th className="py-1.5 px-2">Min Cross-Section</th>
-                <th className="py-1.5 px-2">Error Band</th>
-                <th className="py-1.5 pl-2 text-right">Status</th>
+                <th className="py-1.5 pr-2">{t('whatif.th.object')}</th>
+                <th className="py-1.5 px-2">{t('whatif.th.cross')}</th>
+                <th className="py-1.5 px-2">{t('whatif.th.error')}</th>
+                <th className="py-1.5 pl-2 text-right">{t('whatif.th.status')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -256,17 +258,17 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
                   <td className="py-1.5 pl-2 text-right font-mono whitespace-nowrap">
                     {d.status === 'pass' && (
                       <span className="inline-block px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
-                        PASS
+                        {t('whatif.status.pass')}
                       </span>
                     )}
                     {d.status === 'tight_uncertainty' && (
                       <span className="inline-block px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 whitespace-nowrap">
-                        TIGHT (±cm Risk)
+                        {t('whatif.status.tight')}
                       </span>
                     )}
                     {d.status === 'blocked' && (
                       <span className="inline-block px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 whitespace-nowrap">
-                        DISASSEMBLE / HOIST
+                        {t('whatif.status.blocked')}
                       </span>
                     )}
                   </td>
@@ -277,35 +279,35 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
         </div>
       </div>
 
-      {/* TabPFN-3.5 Moving Logistics & Cost Quantile Module */}
+      {/* Rule-based Moving Logistics & Cost Estimate Module */}
       <div className="p-3.5 rounded-xl bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 border border-indigo-500/30 flex flex-col gap-2.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <Truck className="w-4 h-4 text-indigo-400" />
             <span className="text-xs font-bold text-indigo-200">
-              TabPFN-3.5 Moving Quote & Volume Quantiles (from RoomGraph CSV)
+              {t('whatif.tabpfn.title')}
             </span>
           </div>
           <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono text-[10px]">
-            Partner: TabPFN
+            {t('whatif.tabpfn.partner')}
           </span>
         </div>
 
         <div className="grid grid-cols-3 gap-2 text-xs">
           <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-800">
-            <div className="text-[10px] text-slate-400">Volume / Weight</div>
+            <div className="text-[10px] text-slate-400">{t('whatif.tabpfn.volume')}</div>
             <div className="font-mono font-semibold text-slate-100 mt-0.5">
               {report.tabpfnEstimate.totalVolumeCbm} CBM · {report.tabpfnEstimate.totalWeightKg}kg
             </div>
           </div>
           <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-800">
-            <div className="text-[10px] text-slate-400">Truck & Crew</div>
+            <div className="text-[10px] text-slate-400">{t('whatif.tabpfn.truck')}</div>
             <div className="font-semibold text-sky-300 mt-0.5">
-              {report.tabpfnEstimate.recommendedTruck} ({report.tabpfnEstimate.crewCount} crew)
+              {report.tabpfnEstimate.recommendedTruck} {t('whatif.tabpfn.crew', { n: report.tabpfnEstimate.crewCount })}
             </div>
           </div>
           <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-800">
-            <div className="text-[10px] text-slate-400">Quote (P50 / P90)</div>
+            <div className="text-[10px] text-slate-400">{t('whatif.tabpfn.quote')}</div>
             <div className="font-mono font-semibold text-emerald-300 mt-0.5">
               ${report.tabpfnEstimate.estimatedCostUsd.p50}{' '}
               <span className="text-[10px] text-slate-400">

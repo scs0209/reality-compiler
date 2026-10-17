@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import type { RoomGraph, RoomObjectNode } from '../../shared/roomGraphSchema';
 import { getNodeRect } from '../../shared/spatialEngine';
+import { useI18n, nodeLabel } from '../i18n';
 import {
   RotateCw,
   Plus,
@@ -43,6 +44,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
   showRelationEdges,
   onToggleRelationEdges,
 }) => {
+  const { t, lang } = useI18n();
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('3d');
   const [yawDeg, setYawDeg] = useState<number>(38);
@@ -296,7 +298,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
               }`}
             >
               <Box className="w-3.5 h-3.5" />
-              3D Epistemic Volumes
+              {t('canvas.mode3d')}
             </button>
             <button
               type="button"
@@ -308,13 +310,13 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              2D Metric Blueprint
+              {t('canvas.mode2d')}
             </button>
           </div>
           <span className="px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30 font-mono whitespace-nowrap">
             {viewMode === '3d'
-              ? `Drag to Orbit 3D (${Math.round(yawDeg)}° / ${Math.round(pitchDeg)}°)`
-              : 'Drag to Move · 90° Rotate'}
+              ? t('canvas.hint3d', { yaw: Math.round(yawDeg), pitch: Math.round(pitchDeg) })
+              : t('canvas.hint2d')}
           </span>
         </div>
 
@@ -328,7 +330,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                 : 'bg-slate-800 text-slate-400 border-slate-700'
             }`}
           >
-            ±cm Uncertainty Shell {showUncertaintyHalo ? 'ON' : 'OFF'}
+            {t('canvas.shell')} {showUncertaintyHalo ? t('state.on') : t('state.off')}
           </button>
           <button
             type="button"
@@ -339,7 +341,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                 : 'bg-slate-800 text-slate-400 border-slate-700'
             }`}
           >
-            Relation Edges {showRelationEdges ? 'ON' : 'OFF'}
+            {t('canvas.relationEdges')} {showRelationEdges ? t('state.on') : t('state.off')}
           </button>
           {selectedNodeId && (
             <button
@@ -348,7 +350,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
               className="flex items-center gap-1 px-2.5 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white font-medium transition"
             >
               <RotateCw className="w-3.5 h-3.5" />
-              Rotate 90°
+              {t('canvas.rotate90')}
             </button>
           )}
         </div>
@@ -360,12 +362,13 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
           <div className="flex items-center gap-2">
             <Info className="w-4 h-4 text-sky-400 shrink-0" />
             <span>
-              <strong>Why 3D Epistemic Volumes instead of a photogrammetry mesh?</strong> Decorative 3D
-              meshes hallucinate smooth surfaces over occluded corners. Here,{' '}
-              <span className="text-emerald-300 font-semibold">Observed</span> objects render as solid
-              metric volumes while <span className="text-amber-300 font-semibold">Inferred</span> &{' '}
-              <span className="text-rose-300 font-semibold">Occluded</span> items expose their outer{' '}
-              <code>±cm</code> wireframe uncertainty shells.
+              <strong>{t('canvas.why.title')}</strong> {t('canvas.why.p1')}{' '}
+              <span className="text-emerald-300 font-semibold">{t('canvas.why.obs')}</span>{' '}
+              {t('canvas.why.p2')}{' '}
+              <span className="text-amber-300 font-semibold">{t('canvas.why.inf')}</span>{' '}
+              {t('canvas.why.p3')}{' '}
+              <span className="text-rose-300 font-semibold">{t('canvas.why.occ')}</span>{' '}
+              {t('canvas.why.p4')} <code>±cm</code> {t('canvas.why.p5')}
             </span>
           </div>
         </div>
@@ -375,7 +378,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 bg-slate-950/70 border-b border-slate-800/80 text-xs">
         <div className="flex items-center gap-1.5 text-slate-400">
           <Plus className="w-3.5 h-3.5 text-sky-400" />
-          <span>Inject What-If Furniture:</span>
+          <span>{t('canvas.inject')}</span>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <button
@@ -383,28 +386,28 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
             onClick={() => onAddFurniture('king_bed')}
             className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
           >
-            + King Bed (180×208cm)
+            {t('canvas.add.king')}
           </button>
           <button
             type="button"
             onClick={() => onAddFurniture('sofa_3p')}
             className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
           >
-            + 3-Seater Sofa (210×98cm)
+            {t('canvas.add.sofa')}
           </button>
           <button
             type="button"
             onClick={() => onAddFurniture('washer')}
             className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
           >
-            + WashTower (70×74cm)
+            {t('canvas.add.washer')}
           </button>
           <button
             type="button"
             onClick={() => onAddFurniture('bookshelf')}
             className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
           >
-            + 5-Tier Shelf (80×32cm)
+            {t('canvas.add.shelf')}
           </button>
         </div>
       </div>
@@ -500,7 +503,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                     fontSize="11"
                     fontFamily="JetBrains Mono, monospace"
                   >
-                    3D Room Envelope: {envW}×{envD}×{envH}cm (±{graph.roomEnvelope.uncertaintyCm}cm)
+                    {t('canvas.svg.envelope', { w: envW, d: envD, h: envH, u: graph.roomEnvelope.uncertaintyCm })}
                   </text>
                 </g>
               );
@@ -627,7 +630,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                     fontSize="9.5"
                     fontWeight="600"
                   >
-                    {node.label}
+                    {nodeLabel(node, lang)}
                   </text>
                   <text
                     x={roofCenter.x}
@@ -707,7 +710,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                 fontSize="11"
                 fontFamily="JetBrains Mono, monospace"
               >
-                North Wall: {envW}cm (±{graph.roomEnvelope.uncertaintyCm}cm)
+                {t('canvas.svg.north', { w: envW, u: graph.roomEnvelope.uncertaintyCm })}
               </text>
               <text
                 x={-14}
@@ -718,7 +721,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                 fontFamily="JetBrains Mono, monospace"
                 transform={`rotate(-90, -14, ${envD / 2})`}
               >
-                West Wall: {envD}cm
+                {t('canvas.svg.west', { d: envD })}
               </text>
 
               {graph.epistemicSummary.blindSpots.map((bs, idx) => (
@@ -740,7 +743,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                     fontSize="8.5"
                     fontFamily="JetBrains Mono, monospace"
                   >
-                    Blind Spot #{idx + 1} ({bs.riskLevel})
+                    {t('canvas.svg.blindSpot', { n: idx + 1, risk: bs.riskLevel })}
                   </text>
                 </g>
               ))}
@@ -904,7 +907,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                       fontSize="10.5"
                       fontWeight="600"
                     >
-                      {node.label}
+                      {nodeLabel(node, lang)}
                     </text>
                     <text
                       x={rect.cx}
@@ -939,20 +942,20 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
         <div className="flex flex-wrap items-center gap-4">
           <span className="flex items-center gap-1.5">
             <Eye className="w-3.5 h-3.5 text-emerald-400" />
-            <strong className="text-emerald-300">Observed:</strong> Solid volume · Direct corner visibility
+            <strong className="text-emerald-300">{t('canvas.legend.observed')}</strong> {t('canvas.legend.observedDesc')}
           </span>
           <span className="flex items-center gap-1.5">
             <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
-            <strong className="text-amber-300">Inferred:</strong> Dashed volume · Perspective/prior + ±cm shell
+            <strong className="text-amber-300">{t('canvas.legend.inferred')}</strong> {t('canvas.legend.inferredDesc')}
           </span>
           <span className="flex items-center gap-1.5">
             <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
-            <strong className="text-rose-300">Occluded Prior:</strong> Dotted volume · Blind-spot deduction
+            <strong className="text-rose-300">{t('canvas.legend.occluded')}</strong> {t('canvas.legend.occludedDesc')}
           </span>
         </div>
         <div className="flex items-center gap-1 text-sky-300 font-mono">
           <DoorOpen className="w-3.5 h-3.5" />
-          <span>Blue Arc = Door Swing Clearance</span>
+          <span>{t('canvas.legend.door')}</span>
         </div>
       </div>
     </div>

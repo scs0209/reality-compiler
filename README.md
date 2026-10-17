@@ -1,6 +1,6 @@
 # Reality Compiler (`roomgraph.v1.2`)
 
-> **Compile Reality into Executable Spatial Data** — Turn single room photographs into **`RoomGraph JSON` (`roomgraph.v1.2`)** with metric dimensions, spatial relation edges, and explicit **epistemic uncertainty (`Observed` vs `Inferred` vs `Occluded Prior`)**, complete with an interactive **3D Epistemic Volumes + 2D Metric Blueprint** workbench, **Moving What-If Verification**, and **TabPFN Moving Quote Quantiles**.
+> **Compile Reality into Executable Spatial Data** — Turn single room photographs into **`RoomGraph JSON` (`roomgraph.v1.2`)** with metric dimensions, spatial relation edges, and explicit **epistemic uncertainty (`Observed` vs `Inferred` vs `Occluded Prior`)**, complete with an interactive **3D Epistemic Volumes + 2D Metric Blueprint** workbench, **Moving What-If Verification**, and a **rule-based Moving Quote Estimate (P10 / P50 / P90 range)**.
 
 ## Why Epistemic 3D Volumes Instead of Decorative Photogrammetry Meshes?
 
@@ -20,7 +20,7 @@ Traditional 3D room reconstruction tools generate smooth, texture-baked meshes t
                                     │
              ┌──────────────────────┼──────────────────────┐
              ▼                      ▼                      ▼
-     [Gemma 3: gemma3:4b]   [MongoDB Atlas]       [Moving What-If & TabPFN]
+     [Gemma 3: gemma3:4b]   [MongoDB Atlas]       [Moving What-If & Quote Estimate]
       Vision -> RoomGraph    roomgraphs store      Door bottlenecks, ±cm solver & CSV
 ```
 
@@ -30,10 +30,13 @@ Traditional 3D room reconstruction tools generate smooth, texture-baked meshes t
 | Featured ($200) | **DigitalOcean** | [.do/app.yaml](.do/app.yaml), [deploy/digitalocean-gpu-ollama.sh](deploy/digitalocean-gpu-ollama.sh) | App Platform web/API spec + GPU Droplet `gemma3:4b` provisioning script |
 | Partner ($100) | **.tech Domain** | [.do/app.yaml](.do/app.yaml) | Primary custom domain routing for `realitycompiler.tech` |
 | Partner ($100) | **MongoDB Atlas** | [server/atlasStore.ts](server/atlasStore.ts) | `roomgraphs` collection upsert & full-text search across furniture/epistemic states |
-| Partner ($100) | **Sentry Agent Tracing** | [server/sentryAgentTracer.ts](server/sentryAgentTracer.ts) | OpenTelemetry GenAI spans, latency waterfall, and prompt/completion token tracking |
+| Partner ($100) | **Sentry Agent Tracing** | [server/sentryAgentTracer.ts](server/sentryAgentTracer.ts) | Each compile is a `gen_ai.invoke_agent` trace with `gen_ai.chat` (Gemma), `compiler.assemble` and `db.mongodb.upsert` child spans, measured durations and Ollama's real token counts. It is sent to Sentry only when `SENTRY_DSN` is set; otherwise the UI and `/api/health` say it is not sending. Photos, file names and prompts are never attached. |
 | Partner ($100) | **Entire** | [.entire/settings.json](.entire/settings.json), [entire-session/devrelay-session.json](entire-session/devrelay-session.json) | Live Entire CLI repository tracking (`entire enable`) + embedded session checkpoints |
 | Partner ($100) | **GitHub Copilot** | [.github/copilot-instructions.md](.github/copilot-instructions.md), [.github/workflows/ci.yml](.github/workflows/ci.yml) | Repository instructions enforcing epistemic invariants + GitHub Actions CI gate |
-| Featured ($200) | **TabPFN** | [shared/spatialEngine.ts](shared/spatialEngine.ts) | P10/P50/P90 moving cost quantiles and CSV logistics manifest from RoomGraph features |
+
+### Moving Quote Estimate: How It Is Computed
+
+The moving quote in [shared/spatialEngine.ts](shared/spatialEngine.ts) is a **hand-written, rule-based formula** over RoomGraph features (movable-item volume in CBM, weight in kg, disassembly count, and the number of Inferred/Occluded items). It is **not** a TabPFN or other trained-model inference. P50 is the formula output; P10 and P90 are fixed heuristic spreads (P90 widens with the Inferred/Occluded item count), not calibrated statistical quantiles. A tabular regressor such as TabPFN is not integrated yet.
 
 ## Quick Start
 

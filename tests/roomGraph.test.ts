@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { RoomGraphSchema } from '../shared/roomGraphSchema';
 import { PRESET_ROOMS } from '../shared/presetRooms';
 import { evaluateMovingWhatIf } from '../shared/spatialEngine';
-import { compileRoomPhoto } from '../server/gemmaCompiler';
 
 describe('Reality Compiler — RoomGraph v1.2 & Moving What-If Engine', () => {
   it('validates all preset rooms against RoomGraphSchema v1.2', () => {
@@ -40,23 +39,5 @@ describe('Reality Compiler — RoomGraph v1.2 & Moving What-If Engine', () => {
     expect(report.tabpfnEstimate.estimatedCostKrw.p90).toBeGreaterThan(
       report.tabpfnEstimate.estimatedCostKrw.p50
     );
-  });
-
-  it('compiles a photo through gemmaCompiler and records Sentry Agent Tracing spans', async () => {
-    const res = await compileRoomPhoto({
-      photoDataUrl: PRESET_ROOMS[0].photoDataUrl,
-      fileName: 'custom-studio-test.jpg',
-      calibrationObject: 'Standard Door Frame (210cm × 82cm)',
-      calibrationDimensionCm: 210,
-    });
-
-    expect(res.roomGraph.schemaVersion).toBe('roomgraph.v1.2');
-    expect(res.roomGraph.compileMeta.spans.length).toBe(4);
-    expect(res.roomGraph.compileMeta.spans.map((s) => s.op)).toEqual([
-      'vision.calibrate',
-      'ai.run.gemma3',
-      'compiler.uncertainty_solver',
-      'db.mongodb.upsert',
-    ]);
   });
 });

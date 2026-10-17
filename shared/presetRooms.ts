@@ -10,6 +10,22 @@ export interface PresetRoomSample {
   roomGraph: RoomGraph;
 }
 
+// Preset rooms are hand-authored samples: no model ran, so there are no tokens, spans or trace ids to report.
+function sampleCompileMeta(sampleId: string): RoomGraph['compileMeta'] {
+  return {
+    compileId: sampleId,
+    timestamp: '2026-10-17T00:00:00.000Z',
+    model: 'none (hand-authored sample)',
+    runtime: 'preset-sample',
+    latencyMs: 0,
+    tokens: { prompt: 0, completion: 0, total: 0 },
+    sentryTraceId: '',
+    sentrySpanId: '',
+    atlasPersisted: false,
+    spans: [],
+  };
+}
+
 function makeRoomSvgDataUrl(kind: 'seoul-studio' | 'brooklyn-loft' | 'gangnam-officetel'): string {
   if (kind === 'seoul-studio') {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" width="960" height="600">
@@ -53,7 +69,7 @@ function makeRoomSvgDataUrl(kind: 'seoul-studio' | 'brooklyn-loft' | 'gangnam-of
       <g>
         <rect x="42" y="385" width="145" height="145" rx="8" fill="#be123c" fill-opacity="0.45" stroke="#fb7185" stroke-width="2.5" stroke-dasharray="4,4"/>
       </g>
-      <text x="28" y="38" fill="#94a3b8" font-family="monospace" font-size="14">CAM_01 // URBAN_STUDIO_215SQFT // FOCAL 26mm // GEMMA3_VISION_INPUT</text>
+      <text x="28" y="38" fill="#94a3b8" font-family="monospace" font-size="14">CAM_01 // URBAN_STUDIO_215SQFT // FOCAL 26mm // SAMPLE_ILLUSTRATION</text>
     </svg>`;
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   }
@@ -98,48 +114,7 @@ export const PRESET_ROOMS: PresetRoomSample[] = [
       sceneId: 'scene-seoul-mapo-01',
       title: 'Urban Studio Apartment (RoomGraph v1.2)',
       sourcePhotoUrl: makeRoomSvgDataUrl('seoul-studio'),
-      compileMeta: {
-        compileId: 'cmp_gemma3_mapo_8f92a1',
-        timestamp: '2026-10-17T08:30:12.410Z',
-        model: 'gemma3:4b-it-qat',
-        runtime: 'ollama-gemma3:4b',
-        latencyMs: 1420,
-        tokens: { prompt: 1184, completion: 692, total: 1876 },
-        sentryTraceId: '4bf92f3577b34da6a3ce929d0e0e4736',
-        sentrySpanId: 'a3ce929d0e0e4736',
-        atlasPersisted: true,
-        atlasDocumentId: '6710ca94e4b09a2c4d88f101',
-        spans: [
-          {
-            op: 'vision.calibrate',
-            description: 'Gemma 3 anchor detection (Standard door frame 210cm & window frame)',
-            durationMs: 285,
-            status: 'ok',
-            attributes: { 'anchor.type': 'standard_door_frame', 'scale.px_per_cm': 2.41 },
-          },
-          {
-            op: 'ai.run.gemma3',
-            description: 'gemma3:4b multimodal spatial graph extraction',
-            durationMs: 910,
-            status: 'ok',
-            attributes: { 'gen_ai.request.model': 'gemma3:4b', 'gen_ai.usage.total_tokens': 1876 },
-          },
-          {
-            op: 'compiler.uncertainty_solver',
-            description: 'Epistemic classification (Observed vs Inferred vs Occluded Prior)',
-            durationMs: 140,
-            status: 'ok',
-            attributes: { 'nodes.observed': 3, 'nodes.inferred': 2, 'nodes.occluded': 1 },
-          },
-          {
-            op: 'db.mongodb.upsert',
-            description: 'Persist RoomGraph document to MongoDB Atlas (roomgraphs collection)',
-            durationMs: 85,
-            status: 'ok',
-            attributes: { 'db.system': 'mongodb', 'db.collection': 'roomgraphs' },
-          },
-        ],
-      },
+      compileMeta: sampleCompileMeta('sample_mapo'),
       calibration: {
         referenceObject: 'Standard Door Frame (210cm H × 82cm W)',
         referenceDimensionCm: 210,
@@ -425,48 +400,7 @@ export const PRESET_ROOMS: PresetRoomSample[] = [
       sceneId: 'scene-brooklyn-loft-02',
       title: 'Brooklyn Walk-Up Living Loft — 76cm Door Simulation',
       sourcePhotoUrl: makeRoomSvgDataUrl('brooklyn-loft'),
-      compileMeta: {
-        compileId: 'cmp_gemma3_loft_3c19e4',
-        timestamp: '2026-10-17T08:42:05.112Z',
-        model: 'gemma3:4b-it-qat',
-        runtime: 'ollama-gemma3:4b',
-        latencyMs: 1365,
-        tokens: { prompt: 1210, completion: 645, total: 1855 },
-        sentryTraceId: '91c82b4410a94f118b7e12094ca88123',
-        sentrySpanId: '8b7e12094ca88123',
-        atlasPersisted: true,
-        atlasDocumentId: '6710ca94e4b09a2c4d88f102',
-        spans: [
-          {
-            op: 'vision.calibrate',
-            description: 'Balcony door frame height 210cm anchor',
-            durationMs: 260,
-            status: 'ok',
-            attributes: { 'anchor.type': 'balcony_slider', 'scale.px_per_cm': 2.18 },
-          },
-          {
-            op: 'ai.run.gemma3',
-            description: 'gemma3:4b multimodal spatial graph extraction',
-            durationMs: 890,
-            status: 'ok',
-            attributes: { 'gen_ai.request.model': 'gemma3:4b', 'gen_ai.usage.total_tokens': 1855 },
-          },
-          {
-            op: 'compiler.uncertainty_solver',
-            description: 'Epistemic classification & bottleneck verification',
-            durationMs: 130,
-            status: 'ok',
-            attributes: { 'nodes.observed': 2, 'nodes.inferred': 1, 'nodes.occluded': 1 },
-          },
-          {
-            op: 'db.mongodb.upsert',
-            description: 'Persist RoomGraph document to MongoDB Atlas',
-            durationMs: 85,
-            status: 'ok',
-            attributes: { 'db.system': 'mongodb', 'db.collection': 'roomgraphs' },
-          },
-        ],
-      },
+      compileMeta: sampleCompileMeta('sample_loft'),
       calibration: {
         referenceObject: 'Balcony Sliding Door Frame (210cm H)',
         referenceDimensionCm: 210,
@@ -670,48 +604,7 @@ export const PRESET_ROOMS: PresetRoomSample[] = [
       sceneId: 'scene-gangnam-office-03',
       title: 'Creator Studio Office (Dual Workstation)',
       sourcePhotoUrl: makeRoomSvgDataUrl('gangnam-officetel'),
-      compileMeta: {
-        compileId: 'cmp_gemma3_office_7a04d9',
-        timestamp: '2026-10-17T08:50:44.900Z',
-        model: 'gemma3:4b-it-qat',
-        runtime: 'ollama-gemma3:4b',
-        latencyMs: 1290,
-        tokens: { prompt: 1140, completion: 610, total: 1750 },
-        sentryTraceId: '77a19e0021c44b899f1203948a7712e0',
-        sentrySpanId: '9f1203948a7712e0',
-        atlasPersisted: true,
-        atlasDocumentId: '6710ca94e4b09a2c4d88f103',
-        spans: [
-          {
-            op: 'vision.calibrate',
-            description: '1500mm standard office desk anchor calibration',
-            durationMs: 245,
-            status: 'ok',
-            attributes: { 'anchor.type': 'desk_1500mm', 'scale.px_per_cm': 2.52 },
-          },
-          {
-            op: 'ai.run.gemma3',
-            description: 'gemma3:4b multimodal spatial graph extraction',
-            durationMs: 845,
-            status: 'ok',
-            attributes: { 'gen_ai.request.model': 'gemma3:4b', 'gen_ai.usage.total_tokens': 1750 },
-          },
-          {
-            op: 'compiler.uncertainty_solver',
-            description: 'Epistemic classification & walkway check',
-            durationMs: 120,
-            status: 'ok',
-            attributes: { 'nodes.observed': 3, 'nodes.inferred': 1, 'nodes.occluded': 0 },
-          },
-          {
-            op: 'db.mongodb.upsert',
-            description: 'Persist RoomGraph document to MongoDB Atlas',
-            durationMs: 80,
-            status: 'ok',
-            attributes: { 'db.system': 'mongodb', 'db.collection': 'roomgraphs' },
-          },
-        ],
-      },
+      compileMeta: sampleCompileMeta('sample_office'),
       calibration: {
         referenceObject: 'Standard Studio Desk Tabletop (150cm)',
         referenceDimensionCm: 150,

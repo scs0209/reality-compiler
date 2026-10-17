@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import {
   initSentryAgentTracing,
   getRecentAgentTraces,
-  recordAgentTrace,
+  getSentryStatus,
+  flushSentryAgentTracing,
 } from './sentryAgentTracer';
 import {
   initAtlasStore,
@@ -13,7 +14,7 @@ import {
   saveRoomGraph,
   getRoomGraphById,
 } from './atlasStore';
-import { compileRoomPhoto, GEMMA3_SYSTEM_PROMPT } from './gemmaCompiler';
+import { checkOllama, compileRoomPhoto, GEMMA3_SYSTEM_PROMPT } from './gemmaCompiler';
 import { PRESET_ROOMS } from '../shared/presetRooms';
 import { RoomGraphSchema } from '../shared/roomGraphSchema';
 import { evaluateMovingWhatIf } from '../shared/spatialEngine';
@@ -26,25 +27,9 @@ initSentryAgentTracing();
 const app = express();
 app.use(express.json({ limit: '15mb' }));
 
-// Initialize seeded traces from presets so the Sentry Agent Trace Inspector is populated on first load
-for (const preset of PRESET_ROOMS) {
-  const m = preset.roomGraph.compileMeta;
-  recordAgentTrace({
-    traceId: m.sentryTraceId,
-    rootSpanId: m.sentrySpanId,
-    compileId: m.compileId,
-    timestamp: m.timestamp,
-    model: m.model,
-    runtime: m.runtime,
-    latencyMs: m.latencyMs,
-    tokens: m.tokens,
-    status: 'ok',
-    spans: m.spans,
-  });
-}
-
 app.get('/api/health', async (_req, res) => {
   const atlas = getAtlasHealth();
+  const ollama = await checkOllama();
   res.json({
     ok: true,
     service: 'reality-compiler',
@@ -52,8 +37,10 @@ app.get('/api/health', async (_req, res) => {
     schemaVersion: 'roomgraph.v1.2',
     partners: {
       gemma: {
-        model: process.env.GEMMA_MODEL || 'gemma3:4b',
-        ollamaBaseUrl: process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434',
+        model: ollama.model,
+        ollamaBaseUrl: ollama.endpoint,
+        ollamaReachable: ollama.reachable,
+        modelInstalled: ollama.modelInstalled,
         systemPromptPreview: GEMMA3_SYSTEM_PROMPT.slice(0, 180) + '...',
       },
       digitalOcean: {
@@ -64,18 +51,19 @@ app.get('/api/health', async (_req, res) => {
         demoUrl: process.env.PUBLIC_TECH_DOMAIN || 'https://realitycompiler.tech',
       },
       mongodbAtlas: atlas,
+      // `enabled` is true only when a DSN is configured and the SDK is running; the counters are
+      // what the SDK reported back about delivery, not just what was queued.
       sentryAgentTracing: {
-        enabled: true,
-        dsnConfigured: Boolean(process.env.SENTRY_DSN),
+        ...getSentryStatus(),
         traceCount: getRecentAgentTraces().length,
       },
       entireDevRelay: {
         sessionFile: 'entire-session/devrelay-session.json',
         embeddedInSubmission: true,
       },
-      tabpfn: {
-        model: 'TabPFN-3.5-MovingQuote-Regressor',
-        enabled: true,
+      movingQuote: {
+        method: 'rule_based_formula',
+        tabpfnIntegrated: false,
       },
     },
   });
@@ -118,6 +106,7 @@ app.post('/api/compile', async (req, res) => {
       roomGraph: result.roomGraph,
       whatIf,
       ollamaLiveUsed: result.ollamaLiveUsed,
+      fallback: result.roomGraph.compileMeta.fallback ?? null,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -194,5 +183,18 @@ const PORT = Number(process.env.PORT) || 8787;
 initAtlasStore().finally(() => {
   app.listen(PORT, '127.0.0.1', () => {
     console.log(`[Reality Compiler API] listening on http://127.0.0.1:${PORT}`);
+    const sentry = getSentryStatus();
+    console.log(
+      sentry.enabled
+        ? `[Sentry] agent tracing on (tracesSampleRate ${sentry.tracesSampleRate})`
+        : `[Sentry] agent tracing off: ${sentry.reason}`
+    );
   });
 });
+
+// Spans are sent in the background; give the SDK a moment to deliver the last ones on shutdown.
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.once(signal, () => {
+    flushSentryAgentTracing().finally(() => process.exit(0));
+  });
+}

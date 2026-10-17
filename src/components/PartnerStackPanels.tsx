@@ -10,9 +10,21 @@ import {
   GitBranch,
   Cpu,
 } from 'lucide-react';
+import { useI18n } from '../i18n';
+
+// Mirrors `partners.sentryAgentTracing` from /api/health.
+export interface SentryStatus {
+  enabled: boolean;
+  reason: string | null;
+  transactionsSent: number;
+  transactionsFailed: number;
+  lastError: string | null;
+}
 
 interface PartnerStackPanelsProps {
   graph: RoomGraph;
+  // null while unknown (health check not answered yet, or the API is unreachable).
+  sentryStatus: SentryStatus | null;
   atlasGraphs: RoomGraph[];
   atlasSearchQuery: string;
   onChangeAtlasSearch: (q: string) => void;
@@ -23,6 +35,7 @@ interface PartnerStackPanelsProps {
 
 export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
   graph,
+  sentryStatus,
   atlasGraphs,
   atlasSearchQuery,
   onChangeAtlasSearch,
@@ -30,6 +43,7 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
   onSaveToAtlas,
   savingAtlas,
 }) => {
+  const { t } = useI18n();
   const [subTab, setSubTab] = useState<'json' | 'sentry' | 'atlas' | 'entire'>('json');
   const [copied, setCopied] = useState(false);
 
@@ -86,7 +100,7 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
             }`}
           >
             <FileCode2 className="w-3.5 h-3.5" />
-            RoomGraph JSON
+            {t('partner.tab.json')}
           </button>
           <button
             type="button"
@@ -98,7 +112,7 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
             }`}
           >
             <Activity className="w-3.5 h-3.5" />
-            Sentry Trace
+            {t('partner.tab.sentry')}
           </button>
           <button
             type="button"
@@ -110,7 +124,7 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
             }`}
           >
             <Database className="w-3.5 h-3.5" />
-            MongoDB Atlas ({atlasGraphs.length})
+            {t('partner.tab.atlas', { n: atlasGraphs.length })}
           </button>
           <button
             type="button"
@@ -122,7 +136,7 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
             }`}
           >
             <GitBranch className="w-3.5 h-3.5" />
-            Entire CLI Session
+            {t('partner.tab.entire')}
           </button>
         </div>
       </div>
@@ -132,8 +146,11 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
         <div className="p-3.5 flex flex-col gap-2.5">
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
             <span className="text-slate-400 font-mono">
-              Schema: <strong className="text-sky-300">{graph.schemaVersion}</strong> · Nodes:{' '}
-              {graph.nodes.length} · Edges: {graph.edges.length}
+              {t('partner.json.schema', {
+                v: graph.schemaVersion,
+                n: graph.nodes.length,
+                e: graph.edges.length,
+              })}
             </span>
             <div className="flex items-center gap-1.5">
               <button
@@ -144,12 +161,12 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
                 {copied ? (
                   <>
                     <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    Copied
+                    {t('partner.json.copied')}
                   </>
                 ) : (
                   <>
                     <Copy className="w-3.5 h-3.5" />
-                    Copy JSON
+                    {t('partner.json.copy')}
                   </>
                 )}
               </button>
@@ -167,7 +184,7 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
                 className="flex items-center gap-1 px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition"
               >
                 <Download className="w-3.5 h-3.5" />
-                Manifest CSV (TabPFN)
+                {t('partner.json.csv')}
               </button>
             </div>
           </div>
@@ -184,30 +201,70 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
             <div className="flex items-center gap-2">
               <Cpu className="w-4 h-4 text-purple-400" />
               <div>
-                <div className="font-mono text-[11px] text-purple-300">
-                  sentry.trace_id: {graph.compileMeta.sentryTraceId}
-                </div>
+                {graph.compileMeta.sentryTraceId && (
+                  <div className="font-mono text-[11px] text-purple-300">
+                    sentry.trace_id: {graph.compileMeta.sentryTraceId}
+                  </div>
+                )}
                 <div className="text-slate-400 text-[11px]">
-                  Model: <strong className="text-slate-200">{graph.compileMeta.model}</strong> ·
-                  Runtime: {graph.compileMeta.runtime}
+                  {t('partner.sentry.model')}{' '}
+                  <strong className="text-slate-200">{graph.compileMeta.model}</strong> ·{' '}
+                  {t('partner.sentry.runtime')} {graph.compileMeta.runtime}
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-3 font-mono">
               <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-200 border border-purple-500/30">
-                Latency: {graph.compileMeta.latencyMs} ms
+                {t('partner.sentry.latency', { ms: graph.compileMeta.latencyMs })}
               </span>
               <span className="px-2 py-0.5 rounded bg-sky-500/20 text-sky-200 border border-sky-500/30">
-                Tokens: {graph.compileMeta.tokens.total} ({graph.compileMeta.tokens.prompt}p +{' '}
-                {graph.compileMeta.tokens.completion}c)
+                {t('partner.sentry.tokens', {
+                  total: graph.compileMeta.tokens.total,
+                  p: graph.compileMeta.tokens.prompt,
+                  c: graph.compileMeta.tokens.completion,
+                })}
               </span>
             </div>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Agent Span Waterfall (Sentry OpenTelemetry GenAI Semantic Conventions)
+          {graph.compileMeta.runtime !== 'preset-sample' && !graph.compileMeta.sentryTraceId && (
+            <div className="p-2.5 rounded-lg bg-amber-950/50 border border-amber-500/40 text-amber-200 text-[11px]">
+              {t('partner.sentry.notSending')}
             </div>
+          )}
+          {sentryStatus?.enabled && (
+            <div className="p-2.5 rounded-lg bg-slate-950 border border-purple-500/30 text-slate-300 text-[11px] font-mono">
+              {t('partner.sentry.delivery', {
+                sent: sentryStatus.transactionsSent,
+                failed: sentryStatus.transactionsFailed,
+              })}
+              {sentryStatus.lastError && (
+                <div className="text-rose-300">
+                  {t('partner.sentry.deliveryError', { error: sentryStatus.lastError })}
+                </div>
+              )}
+            </div>
+          )}
+          {graph.compileMeta.runtime === 'preset-sample' && (
+            <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-700 text-slate-300 text-[11px]">
+              {t('partner.sentry.sampleNote')}
+            </div>
+          )}
+          {graph.compileMeta.fallback && (
+            <div className="p-2.5 rounded-lg bg-amber-950/50 border border-amber-500/40 text-amber-200 text-[11px]">
+              {t('partner.sentry.fallbackNote', {
+                stage: graph.compileMeta.fallback.stage,
+                reason: graph.compileMeta.fallback.reason,
+              })}
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2">
+            {graph.compileMeta.spans.length > 0 && (
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                {t('partner.sentry.waterfall')}
+              </div>
+            )}
             {graph.compileMeta.spans.map((span, idx) => {
               const widthPct = Math.max(
                 8,
@@ -220,7 +277,14 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
                   className="p-2.5 rounded-lg bg-slate-950/90 border border-slate-800 flex flex-col gap-1.5"
                 >
                   <div className="flex items-center justify-between font-mono text-[11px]">
-                    <span className="text-purple-300 font-semibold">{span.op}</span>
+                    <span className="text-purple-300 font-semibold">
+                      {span.op}
+                      {span.status !== 'ok' && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-normal">
+                          {span.status}
+                        </span>
+                      )}
+                    </span>
                     <span className="text-slate-400">{span.durationMs} ms</span>
                   </div>
                   <div className="text-slate-300 text-[11px]">{span.description}</div>
@@ -259,7 +323,7 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
                 type="text"
                 value={atlasSearchQuery}
                 onChange={(e) => onChangeAtlasSearch(e.target.value)}
-                placeholder="Search MongoDB Atlas (furniture label, observed/inferred, title)..."
+                placeholder={t('partner.atlas.placeholder')}
                 className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500"
               />
             </div>
@@ -269,7 +333,7 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
               disabled={savingAtlas}
               className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-medium transition"
             >
-              {savingAtlas ? 'Saving to Atlas...' : 'Upsert RoomGraph to Atlas'}
+              {savingAtlas ? t('partner.atlas.saving') : t('partner.atlas.upsert')}
             </button>
           </div>
 
@@ -287,12 +351,16 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
                 <div>
                   <div className="font-semibold text-slate-200">{item.title}</div>
                   <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                    sceneId: {item.sceneId} · {item.roomEnvelope.widthCm}×
-                    {item.roomEnvelope.depthCm}cm · {item.nodes.length} objects
+                    {t('partner.atlas.sceneId', {
+                      id: item.sceneId,
+                      w: item.roomEnvelope.widthCm,
+                      d: item.roomEnvelope.depthCm,
+                      n: item.nodes.length,
+                    })}
                   </div>
                 </div>
                 <span className="px-2 py-0.5 rounded bg-slate-900 text-emerald-300 border border-emerald-500/30 font-mono text-[10px]">
-                  Load Scene
+                  {t('partner.atlas.load')}
                 </span>
               </div>
             ))}
@@ -304,34 +372,22 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
       {subTab === 'entire' && (
         <div className="p-3.5 flex flex-col gap-2.5 text-xs">
           <div className="p-2.5 rounded-lg bg-amber-950/25 border border-amber-500/30 text-amber-200">
-            <div className="font-semibold">
-              Entire CLI Active (`.entire/settings.json` + `entire-session/devrelay-session.json`)
-            </div>
-            <p className="text-[11px] opacity-85 mt-0.5">
-              Git hooks and checkpoints are tracked via Entire CLI (`entire status` / `entire
-              checkpoint list`), documenting why we built epistemic 3D/2D uncertainty volumes
-              instead of hallucinated photogrammetry meshes.
-            </p>
+            <div className="font-semibold">{t('partner.entire.title')}</div>
+            <p className="text-[11px] opacity-85 mt-0.5">{t('partner.entire.body')}</p>
           </div>
 
           <div className="space-y-2 font-mono text-[11px] text-slate-300 bg-slate-950 p-3 rounded-lg border border-slate-800">
             <div>
-              <span className="text-amber-400">[Checkpoint #1 — Schema Design]</span> Single-image
-              3D surface meshes hallucinate over occluded corners and create false precision. We
-              designed <code>roomgraph.v1.2</code> so every object carries{' '}
-              <code>epistemic: observed | inferred | occluded_prior</code> and explicit{' '}
-              <code>±cm</code> error bands.
+              <span className="text-amber-400">{t('partner.entire.cp1.label')}</span>{' '}
+              {t('partner.entire.cp1.body')}
             </div>
             <div>
-              <span className="text-sky-400">[Checkpoint #2 — Gemma 3 Vision Prompt]</span>{' '}
-              <code>gemma3:4b</code> first calibrates pixel-to-cm scale against a standard door frame
-              (210×82cm) before extracting 2D bboxes, 3D bounding volumes, and blind spots.
+              <span className="text-sky-400">{t('partner.entire.cp2.label')}</span>{' '}
+              {t('partner.entire.cp2.body')}
             </div>
             <div>
-              <span className="text-emerald-400">[Checkpoint #3 — 3D Epistemic Volumes & Solver]</span>{' '}
-              Added interactive 3D Epistemic Volumes + 2D Blueprint toggle, flagging{' '}
-              <code>UNCERTAINTY_OVERFLOW</code> when two items pass nominally (2cm gap) but collide
-              under <code>±12cm</code> combined uncertainty.
+              <span className="text-emerald-400">{t('partner.entire.cp3.label')}</span>{' '}
+              {t('partner.entire.cp3.body')}
             </div>
           </div>
         </div>

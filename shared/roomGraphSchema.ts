@@ -48,7 +48,9 @@ export const RoomObjectNodeSchema = z.object({
   epistemic: EpistemicStatusSchema,
   confidence: z.number().min(0).max(1),
   evidenceSource: z.string(),
-  bbox2d: BBox2DSchema,
+  // Where the object is in the source photo; null when unknown (e.g. a what-if injected item, or a
+  // vision answer whose box was unusable) so nothing is drawn rather than a made-up box.
+  bbox2d: BBox2DSchema.nullable(),
   footprint: FootprintSchema,
   uncertainty: UncertaintyBandSchema,
   movable: z.boolean(),
@@ -108,17 +110,40 @@ export const BlindSpotSchema = z.object({
 export const CalibrationAnchorSchema = z.object({
   referenceObject: z.string(),
   referenceDimensionCm: z.number().positive(),
-  pixelToCmRatio: z.number().positive(),
+  // null when the compiler did no pixel-level calibration (e.g. Gemma only estimates scale from the anchor).
+  pixelToCmRatio: z.number().positive().nullable(),
   scaleConfidence: z.number().min(0).max(1),
   perspectiveTiltDeg: z.number(),
   method: z.string(),
 });
 
+// Why a compile did not produce a graph from the user's photo.
+export const FallbackStageSchema = z.enum([
+  'unsupported_image', // not png/jpeg/webp, so it cannot be sent to the vision model
+  'unavailable', // Ollama endpoint unreachable
+  'model_missing', // Ollama is up but the configured Gemma model is not pulled
+  'timeout',
+  'http_error',
+  'invalid_json',
+  'schema_invalid', // JSON parsed but no usable RoomGraph could be built from it
+]);
+
+export type FallbackStage = z.infer<typeof FallbackStageSchema>;
+
 export const CompileTelemetrySchema = z.object({
   compileId: z.string(),
   timestamp: z.string(),
   model: z.string(),
-  runtime: z.enum(['ollama-gemma3:4b', 'digitalocean-gradient-gemma3', 'hybrid-vision-compiler']),
+  // ollama-gemma3:4b / digitalocean-gradient-gemma3: graph came from a Gemma response.
+  // fallback-preset: Gemma failed; the graph is a bundled sample NOT derived from the photo.
+  // preset-sample: hand-authored sample room; no compile was run.
+  runtime: z.enum([
+    'ollama-gemma3:4b',
+    'digitalocean-gradient-gemma3',
+    'fallback-preset',
+    'preset-sample',
+  ]),
+  fallback: z.object({ stage: FallbackStageSchema, reason: z.string() }).optional(),
   latencyMs: z.number().nonnegative(),
   tokens: z.object({
     prompt: z.number().nonnegative(),
@@ -211,6 +236,7 @@ export interface MovingWhatIfReport {
     status: 'pass' | 'uncertainty_risk' | 'blocked';
   }[];
   violations: ConstraintViolation[];
+  // Field name is historical: the estimate is a rule-based formula, not TabPFN.
   tabpfnEstimate: {
     modelVersion: string;
     totalVolumeCbm: number;

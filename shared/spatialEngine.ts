@@ -323,7 +323,8 @@ export function evaluateMovingWhatIf(
     }
   }
 
-  // 5. TabPFN-3.5 Tabular Moving Cost & Volume Quantile Estimator
+  // 5. Rule-based moving cost & volume estimate. This is a hand-written formula,
+  // not a TabPFN (or any trained model) inference; P10/P90 are heuristic spreads.
   const movableNodes = graph.nodes.filter((n) => n.movable);
   const totalVolumeCbm = Number(
     movableNodes
@@ -385,7 +386,7 @@ export function evaluateMovingWhatIf(
     corridorClearances,
     violations,
     tabpfnEstimate: {
-      modelVersion: 'TabPFN-3.5-MovingQuote-Regressor',
+      modelVersion: 'rule-based-moving-quote-v1',
       totalVolumeCbm,
       totalWeightKg,
       recommendedTruck,

@@ -1,6 +1,7 @@
 import React from 'react';
 import type { RoomGraph, RoomObjectNode } from '../../shared/roomGraphSchema';
 import { Eye, Sparkles, Compass } from 'lucide-react';
+import { useI18n, nodeLabel } from '../i18n';
 
 interface EvidencePhotoPanelProps {
   graph: RoomGraph;
@@ -17,6 +18,7 @@ export const EvidencePhotoPanel: React.FC<EvidencePhotoPanelProps> = ({
   showBBoxOverlay,
   onToggleBBoxOverlay,
 }) => {
+  const { t, lang } = useI18n();
   const badgeColor = (epistemic: RoomObjectNode['epistemic']) => {
     if (epistemic === 'observed') {
       return 'border-emerald-400 bg-emerald-500/20 text-emerald-200';
@@ -33,7 +35,7 @@ export const EvidencePhotoPanel: React.FC<EvidencePhotoPanelProps> = ({
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-sky-400" />
           <span className="font-semibold text-slate-200">
-            Source Evidence Photo (Gemma 3 Vision BBox & Epistemic State)
+            {t('evidence.title')}
           </span>
         </div>
         <button
@@ -46,7 +48,7 @@ export const EvidencePhotoPanel: React.FC<EvidencePhotoPanelProps> = ({
           }`}
         >
           <Eye className="w-3.5 h-3.5" />
-          Vision Overlay {showBBoxOverlay ? 'ON' : 'OFF'}
+          {t('evidence.overlay')} {showBBoxOverlay ? t('state.on') : t('state.off')}
         </button>
       </div>
 
@@ -60,11 +62,13 @@ export const EvidencePhotoPanel: React.FC<EvidencePhotoPanelProps> = ({
 
         {showBBoxOverlay &&
           graph.nodes.map((node) => {
+            const box = node.bbox2d;
+            if (!box) return null;
             const isSelected = selectedNodeId === node.id;
-            const left = `${node.bbox2d.x * 100}%`;
-            const top = `${node.bbox2d.y * 100}%`;
-            const width = `${node.bbox2d.w * 100}%`;
-            const height = `${node.bbox2d.h * 100}%`;
+            const left = `${box.x * 100}%`;
+            const top = `${box.y * 100}%`;
+            const width = `${box.w * 100}%`;
+            const height = `${box.h * 100}%`;
 
             const borderStyle =
               node.epistemic === 'observed'
@@ -89,7 +93,7 @@ export const EvidencePhotoPanel: React.FC<EvidencePhotoPanelProps> = ({
                     node.epistemic
                   )}`}
                 >
-                  <span className="font-semibold">{node.label}</span>
+                  <span className="font-semibold">{nodeLabel(node, lang)}</span>
                   <span>{Math.round(node.confidence * 100)}%</span>
                 </div>
               </div>
@@ -102,15 +106,19 @@ export const EvidencePhotoPanel: React.FC<EvidencePhotoPanelProps> = ({
         <div className="flex items-center gap-2 text-slate-300">
           <Compass className="w-4 h-4 text-sky-400 shrink-0" />
           <span>
-            <strong className="text-slate-100">Scale Anchor:</strong>{' '}
+            <strong className="text-slate-100">{t('evidence.scale')}</strong>{' '}
             {graph.calibration.referenceObject} ({graph.calibration.referenceDimensionCm}cm)
           </span>
         </div>
         <div className="flex items-center gap-3 font-mono text-[11px] text-slate-400">
-          <span>px/cm: {graph.calibration.pixelToCmRatio}</span>
-          <span>Tilt: {graph.calibration.perspectiveTiltDeg}°</span>
+          <span>
+            {t('evidence.pxcm')} {graph.calibration.pixelToCmRatio ?? t('evidence.na')}
+          </span>
+          <span>
+            {t('evidence.tilt')} {graph.calibration.perspectiveTiltDeg}°
+          </span>
           <span className="text-emerald-400">
-            Scale Conf: {Math.round(graph.calibration.scaleConfidence * 100)}%
+            {t('evidence.scaleConf')} {Math.round(graph.calibration.scaleConfidence * 100)}%
           </span>
         </div>
       </div>

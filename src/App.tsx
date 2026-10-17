@@ -5,8 +5,11 @@ import { evaluateMovingWhatIf } from '../shared/spatialEngine';
 import { EvidencePhotoPanel } from './components/EvidencePhotoPanel';
 import { TopDownCanvas } from './components/TopDownCanvas';
 import { WhatIfSimulatorPanel } from './components/WhatIfSimulatorPanel';
-import { PartnerStackPanels } from './components/PartnerStackPanels';
+import { PartnerStackPanels, type SentryStatus } from './components/PartnerStackPanels';
+import { useI18n, nodeLabel, presetCopy } from './i18n';
+import { downscaleImageDataUrl } from './imageUtils';
 import {
+  AlertTriangle,
   Cpu,
   Upload,
   Sparkles,
@@ -18,6 +21,7 @@ import {
 } from 'lucide-react';
 
 export function App() {
+  const { t, lang, toggleLang } = useI18n();
   const [selectedPresetId, setSelectedPresetId] = useState<string>(PRESET_ROOMS[0].id);
   const [roomGraph, setRoomGraph] = useState<RoomGraph>(() =>
     structuredClone(PRESET_ROOMS[0].roomGraph)
@@ -25,6 +29,14 @@ export function App() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(
     PRESET_ROOMS[0].roomGraph.nodes[0]?.id || null
   );
+  // The graph as last loaded/compiled, so "reset layout" restores it rather than a preset.
+  const [baseGraph, setBaseGraph] = useState<RoomGraph>(() =>
+    structuredClone(PRESET_ROOMS[0].roomGraph)
+  );
+  const [uploadedPhoto, setUploadedPhoto] = useState<{
+    dataUrl: string;
+    fileName: string;
+  } | null>(null);
 
   // Visual toggles
   const [showBBoxOverlay, setShowBBoxOverlay] = useState(true);
@@ -50,6 +62,7 @@ export function App() {
   const [atlasSearchQuery, setAtlasSearchQuery] = useState('');
   const [savingAtlas, setSavingAtlas] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [sentryStatus, setSentryStatus] = useState<SentryStatus | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -59,6 +72,7 @@ export function App() {
   };
 
   const applyNewRoomGraph = (nextGraph: RoomGraph) => {
+    setBaseGraph(structuredClone(nextGraph));
     setRoomGraph(structuredClone(nextGraph));
     const entryDoor =
       nextGraph.roomEnvelope.openings.find((o) => o.kind === 'entry_door') ||
@@ -68,6 +82,17 @@ export function App() {
     }
     setSelectedNodeId(nextGraph.nodes[0]?.id || null);
   };
+
+  const refreshSentryStatus = () => {
+    fetch('/api/health')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setSentryStatus(data?.partners?.sentryAgentTracing ?? null))
+      .catch(() => setSentryStatus(null));
+  };
+
+  useEffect(() => {
+    refreshSentryStatus();
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -101,70 +126,65 @@ export function App() {
     return roomGraph.nodes.filter((n) => n.epistemic === epistemicFilter);
   }, [roomGraph.nodes, epistemicFilter]);
 
-  const handleSelectPreset = async (presetId: string) => {
-    setSelectedPresetId(presetId);
+  // Presets are hand-authored samples: loading one runs no compile.
+  const handleSelectPreset = (presetId: string) => {
     const preset = PRESET_ROOMS.find((p) => p.id === presetId);
     if (!preset) return;
+    setSelectedPresetId(presetId);
+    applyNewRoomGraph(preset.roomGraph);
+    showToast(t('app.toast.sample', { name: presetCopy(preset, lang).name }));
+  };
 
+  const compilePhoto = async (photo: { dataUrl: string; fileName: string }) => {
     setIsCompiling(true);
     try {
       const res = await fetch('/api/compile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          presetId,
-          photoDataUrl: preset.photoDataUrl,
+          photoDataUrl: photo.dataUrl,
+          fileName: photo.fileName,
           calibrationObject,
           calibrationDimensionCm: calibrationCm,
         }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        applyNewRoomGraph(data.roomGraph);
-        showToast(
-          `Gemma 3 vision compile finished (${data.roomGraph.compileMeta.latencyMs}ms · Sentry trace recorded)`
-        );
-      } else {
-        applyNewRoomGraph(preset.roomGraph);
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || `HTTP ${res.status}`);
       }
-    } catch {
-      applyNewRoomGraph(preset.roomGraph);
+      const data = await res.json();
+      applyNewRoomGraph(data.roomGraph);
+      showToast(
+        data.roomGraph.compileMeta.fallback
+          ? t('app.toast.fallback')
+          : t('app.toast.uploaded', { name: photo.fileName })
+      );
+    } catch (err) {
+      // Keep the current graph: never substitute a made-up result for a failed compile.
+      showToast(
+        t('app.toast.compileFailed', {
+          reason: err instanceof Error ? err.message : String(err),
+        })
+      );
     } finally {
       setIsCompiling(false);
+      // Spans are delivered in the background, so look again shortly after the compile.
+      refreshSentryStatus();
+      setTimeout(refreshSentryStatus, 3000);
     }
   };
 
   const handleUploadPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = ''; // allow picking the same file again
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async () => {
-      const dataUrl = String(reader.result || '');
-      setIsCompiling(true);
-      try {
-        const res = await fetch('/api/compile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            photoDataUrl: dataUrl,
-            fileName: file.name,
-            calibrationObject,
-            calibrationDimensionCm: calibrationCm,
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          applyNewRoomGraph(data.roomGraph);
-          showToast(`Compiled "${file.name}" into RoomGraph v1.2!`);
-        }
-      } catch {
-        const customGraph = structuredClone(roomGraph);
-        customGraph.title = `${file.name} — Compiled RoomGraph`;
-        customGraph.sourcePhotoUrl = dataUrl;
-        applyNewRoomGraph(customGraph);
-      } finally {
-        setIsCompiling(false);
-      }
+      const dataUrl = await downscaleImageDataUrl(String(reader.result || ''));
+      const photo = { dataUrl, fileName: file.name };
+      setUploadedPhoto(photo);
+      setSelectedPresetId('');
+      await compilePhoto(photo);
     };
     reader.readAsDataURL(file);
   };
@@ -222,6 +242,7 @@ export function App() {
       typeof kind,
       {
         label: string;
+        labelKo: string;
         w: number;
         d: number;
         h: number;
@@ -231,6 +252,7 @@ export function App() {
     > = {
       king_bed: {
         label: 'King Bed (What-If)',
+        labelKo: '킹 침대 (What-If)',
         w: 180,
         d: 208,
         h: 95,
@@ -239,6 +261,7 @@ export function App() {
       },
       sofa_3p: {
         label: '3-Seater Sofa (What-If)',
+        labelKo: '3인용 소파 (What-If)',
         w: 210,
         d: 98,
         h: 92,
@@ -247,6 +270,7 @@ export function App() {
       },
       washer: {
         label: 'WashTower Dryer (What-If)',
+        labelKo: '워시타워 건조기 (What-If)',
         w: 70,
         d: 74,
         h: 189,
@@ -255,6 +279,7 @@ export function App() {
       },
       bookshelf: {
         label: '5-Tier Bookshelf (What-If)',
+        labelKo: '5단 책장 (What-If)',
         w: 80,
         d: 32,
         h: 185,
@@ -268,12 +293,12 @@ export function App() {
     const newNode: RoomObjectNode = {
       id: newId,
       label: s.label,
-      labelKo: s.label,
+      labelKo: s.labelKo,
       category: kind === 'washer' ? 'appliance' : 'furniture',
       epistemic: 'inferred',
       confidence: 0.85,
       evidenceSource: 'Injected from What-If Moving Catalog with manufacturer dimensions',
-      bbox2d: { x: 0.35, y: 0.45, w: 0.22, h: 0.22 },
+      bbox2d: null, // injected what-if item: not in the photo
       footprint: {
         xCm: 90,
         yCm: 140,
@@ -298,7 +323,7 @@ export function App() {
       nodes: [...prev.nodes, newNode],
     }));
     setSelectedNodeId(newId);
-    showToast(`Added ${s.label}. Switch to 2D Blueprint to drag or 3D Volumes to inspect!`);
+    showToast(t('app.toast.added', { name: nodeLabel(s, lang) }));
   };
 
   const handleSaveToAtlas = async () => {
@@ -315,7 +340,7 @@ export function App() {
           const d = await listRes.json();
           setAtlasGraphs(d.items || []);
         }
-        showToast('Upserted current RoomGraph to MongoDB Atlas (roomgraphs collection).');
+        showToast(t('app.toast.saved'));
       }
     } finally {
       setSavingAtlas(false);
@@ -334,20 +359,17 @@ export function App() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base font-bold tracking-tight text-white">
-                  Reality Compiler
+                  {t('app.title')}
                 </h1>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30">
                   roomgraph.v1.2
                 </span>
                 <span className="hidden md:inline-block text-xs text-slate-400">
-                  — Compile room photos into executable spatial graphs with epistemic uncertainty
+                  {t('app.tagline')}
                 </span>
               </div>
               <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-2 mt-0.5">
-                <span>
-                  Outputs actionable reality data (3D epistemic volumes, ±cm error bars, moving
-                  bottlenecks) instead of decorative 3D meshes
-                </span>
+                <span>{t('app.subtagline')}</span>
               </div>
             </div>
           </div>
@@ -369,12 +391,30 @@ export function App() {
             <span className="px-2 py-1 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
               MongoDB Atlas
             </span>
-            <span className="px-2 py-1 rounded-md bg-purple-500/15 text-purple-300 border border-purple-500/30">
-              Sentry Agent Tracing
+            <span
+              title={sentryStatus && !sentryStatus.enabled ? (sentryStatus.reason ?? undefined) : undefined}
+              className={`px-2 py-1 rounded-md border ${
+                sentryStatus?.enabled
+                  ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+                  : 'bg-slate-800/60 text-slate-400 border-slate-700'
+              }`}
+            >
+              {sentryStatus === null
+                ? t('app.pill.sentryUnknown')
+                : sentryStatus.enabled
+                  ? t('app.pill.sentry')
+                  : t('app.pill.sentryOff')}
             </span>
             <span className="px-2 py-1 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30">
-              Entire CLI Tracked
+              {t('app.pill.entire')}
             </span>
+            <button
+              type="button"
+              onClick={toggleLang}
+              className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-sans font-semibold transition"
+            >
+              {t('app.lang.toggle')}
+            </button>
           </div>
         </div>
       </header>
@@ -395,7 +435,7 @@ export function App() {
           <div className="p-3.5 rounded-xl bg-slate-900/95 border border-slate-800 flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                1. Reality Evidence (Photo / Presets)
+                {t('app.section.evidence')}
               </h2>
               <button
                 type="button"
@@ -403,7 +443,7 @@ export function App() {
                 className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium whitespace-nowrap shrink-0 transition"
               >
                 <Upload className="w-3.5 h-3.5" />
-                Upload Photo
+                {t('app.btn.upload')}
               </button>
               <input
                 ref={fileInputRef}
@@ -417,6 +457,7 @@ export function App() {
             <div className="flex flex-col gap-1.5">
               {PRESET_ROOMS.map((preset) => {
                 const active = selectedPresetId === preset.id;
+                const copy = presetCopy(preset, lang);
                 return (
                   <button
                     key={preset.id}
@@ -429,15 +470,15 @@ export function App() {
                     }`}
                   >
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-xs font-semibold">{preset.name}</span>
+                      <span className="text-xs font-semibold">{copy.name}</span>
                     </div>
-                    <span className="text-[11px] text-slate-400">{preset.subtitle}</span>
+                    <span className="text-[11px] text-slate-400">{copy.subtitle}</span>
                     <div className="flex items-center justify-between mt-0.5">
                       <span className="text-[10px] font-mono text-sky-400">
                         {preset.roomType}
                       </span>
                       <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-900 text-slate-300 border border-slate-800">
-                        {preset.badge}
+                        {copy.badge}
                       </span>
                     </div>
                   </button>
@@ -448,7 +489,7 @@ export function App() {
             {/* Calibration Anchor Controls */}
             <div className="pt-2 border-t border-slate-800 flex flex-col gap-2 text-xs">
               <div className="text-[11px] font-semibold text-slate-300">
-                Scale Reference (Calibration Anchor)
+                {t('app.calib.title')}
               </div>
               <div className="flex gap-2">
                 <input
@@ -469,14 +510,13 @@ export function App() {
               </div>
               <button
                 type="button"
-                disabled={isCompiling}
-                onClick={() => handleSelectPreset(selectedPresetId)}
+                disabled={isCompiling || !uploadedPhoto}
+                title={uploadedPhoto ? undefined : t('app.btn.recompileHint')}
+                onClick={() => uploadedPhoto && compilePhoto(uploadedPhoto)}
                 className="w-full py-2 rounded-lg bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 disabled:opacity-50 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                {isCompiling
-                  ? 'Compiling with Gemma 3 (gemma3:4b)...'
-                  : 'Re-Compile RoomGraph with Gemma 3'}
+                {isCompiling ? t('app.btn.compiling') : t('app.btn.recompile')}
               </button>
             </div>
           </div>
@@ -485,10 +525,10 @@ export function App() {
           <div className="p-3.5 rounded-xl bg-slate-900/95 border border-slate-800 flex flex-col gap-2.5 flex-1">
             <div className="flex items-center justify-between">
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                2. Epistemic Classification (Observed vs Inferred)
+                {t('app.section.epistemic')}
               </h2>
               <span className="text-xs font-mono text-emerald-400">
-                Mean Conf: {Math.round(roomGraph.epistemicSummary.overallConfidence * 100)}%
+                {t('app.meanConf', { pct: Math.round(roomGraph.epistemicSummary.overallConfidence * 100) })}
               </span>
             </div>
 
@@ -503,7 +543,7 @@ export function App() {
                     : 'bg-slate-950 text-slate-400 border-slate-800'
                 }`}
               >
-                All ({roomGraph.nodes.length})
+                {t('app.filter.all', { n: roomGraph.nodes.length })}
               </button>
               <button
                 type="button"
@@ -514,7 +554,7 @@ export function App() {
                     : 'bg-slate-950 text-emerald-400/70 border-slate-800'
                 }`}
               >
-                Obs ({roomGraph.nodes.filter((n) => n.epistemic === 'observed').length})
+                {t('app.filter.obs', { n: roomGraph.nodes.filter((n) => n.epistemic === 'observed').length })}
               </button>
               <button
                 type="button"
@@ -525,7 +565,7 @@ export function App() {
                     : 'bg-slate-950 text-amber-400/70 border-slate-800'
                 }`}
               >
-                Inf ({roomGraph.nodes.filter((n) => n.epistemic === 'inferred').length})
+                {t('app.filter.inf', { n: roomGraph.nodes.filter((n) => n.epistemic === 'inferred').length })}
               </button>
               <button
                 type="button"
@@ -536,7 +576,7 @@ export function App() {
                     : 'bg-slate-950 text-rose-400/70 border-slate-800'
                 }`}
               >
-                Occ ({roomGraph.nodes.filter((n) => n.epistemic === 'occluded_prior').length})
+                {t('app.filter.occ', { n: roomGraph.nodes.filter((n) => n.epistemic === 'occluded_prior').length })}
               </button>
             </div>
 
@@ -557,7 +597,7 @@ export function App() {
                     }`}
                   >
                     <div className="flex items-center justify-between gap-1">
-                      <span className="font-semibold text-slate-100">{node.label}</span>
+                      <span className="font-semibold text-slate-100">{nodeLabel(node, lang)}</span>
                       <span
                         className={`px-1.5 py-0.5 rounded text-[10px] font-mono border ${
                           node.epistemic === 'observed'
@@ -567,15 +607,14 @@ export function App() {
                             : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
                         }`}
                       >
-                        {node.epistemic === 'observed' && 'OBSERVED'}
-                        {node.epistemic === 'inferred' && 'INFERRED'}
-                        {node.epistemic === 'occluded_prior' && 'OCCLUDED'} ·{' '}
+                        {node.epistemic === 'observed' && t('badge.observed')}
+                        {node.epistemic === 'inferred' && t('badge.inferred')}
+                        {node.epistemic === 'occluded_prior' && t('badge.occluded')} ·{' '}
                         {Math.round(node.confidence * 100)}%
                       </span>
                     </div>
                     <div className="text-[11px] font-mono text-slate-400 mt-1">
-                      Size: {node.footprint.widthCm}×{node.footprint.depthCm}×
-                      {node.footprint.heightCm}cm · Uncertainty: ±{uncSum}cm
+                      {t('app.size', { w: node.footprint.widthCm, d: node.footprint.depthCm, h: node.footprint.heightCm, u: uncSum })}
                     </div>
                     <p className="text-[11px] text-slate-300/90 mt-1 leading-snug">
                       {node.evidenceSource}
@@ -589,14 +628,14 @@ export function App() {
             {selectedNode && (
               <div className="mt-auto pt-2.5 border-t border-slate-800 flex items-center justify-between text-xs">
                 <span className="text-slate-300 font-medium truncate">
-                  Selected: <strong className="text-sky-300">{selectedNode.label}</strong>
+                  {t('app.selected')} <strong className="text-sky-300">{nodeLabel(selectedNode, lang)}</strong>
                 </span>
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => handleRotateNode(selectedNode.id)}
                     className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
-                    title="Rotate 90 degrees"
+                    title={t('app.rotateTitle')}
                   >
                     <RotateCw className="w-3.5 h-3.5" />
                   </button>
@@ -604,7 +643,7 @@ export function App() {
                     type="button"
                     onClick={() => handleDeleteNode(selectedNode.id)}
                     className="p-1.5 rounded bg-rose-950/60 hover:bg-rose-900/70 text-rose-300 border border-rose-500/30"
-                    title="Remove Object"
+                    title={t('app.removeTitle')}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -616,6 +655,28 @@ export function App() {
 
         {/* CENTER COLUMN (5 cols): Source Photo Overlay + Interactive 3D / 2D Spatial Viewer */}
         <section className="lg:col-span-5 flex flex-col gap-3.5">
+          {isCompiling && (
+            <div className="p-3 rounded-xl bg-sky-950/50 border border-sky-500/40 text-sky-200 text-xs">
+              {t('app.compiling.note')}
+            </div>
+          )}
+          {roomGraph.compileMeta.fallback && (
+            <div
+              role="alert"
+              className="flex items-start gap-2 p-3 rounded-xl bg-amber-950/60 border border-amber-500/50 text-amber-100 text-xs"
+            >
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+              <div className="flex flex-col gap-0.5">
+                <div className="font-semibold">{t('app.fallback.title')}</div>
+                <div className="text-amber-200/90">
+                  {t('app.fallback.body', {
+                    stage: roomGraph.compileMeta.fallback.stage,
+                    reason: roomGraph.compileMeta.fallback.reason,
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
           <EvidencePhotoPanel
             graph={roomGraph}
             selectedNodeId={selectedNodeId}
@@ -649,21 +710,20 @@ export function App() {
             onChangeMinWalkway={setMinWalkwayCm}
             onSelectNode={(id) => setSelectedNodeId(id)}
             onResetLayout={() => {
-              const preset =
-                PRESET_ROOMS.find((p) => p.id === selectedPresetId) || PRESET_ROOMS[0];
-              applyNewRoomGraph(preset.roomGraph);
-              showToast('Reset to initial compiled layout.');
+              applyNewRoomGraph(baseGraph);
+              showToast(t('app.toast.reset'));
             }}
           />
 
           <PartnerStackPanels
             graph={roomGraph}
+            sentryStatus={sentryStatus}
             atlasGraphs={atlasGraphs}
             atlasSearchQuery={atlasSearchQuery}
             onChangeAtlasSearch={setAtlasSearchQuery}
             onLoadRoomGraph={(g) => {
               applyNewRoomGraph(g);
-              showToast(`Loaded "${g.title}" from MongoDB Atlas.`);
+              showToast(t('app.toast.loaded', { title: g.title }));
             }}
             onSaveToAtlas={handleSaveToAtlas}
             savingAtlas={savingAtlas}

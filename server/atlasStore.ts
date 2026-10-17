@@ -87,7 +87,8 @@ export async function saveRoomGraph(graph: RoomGraph): Promise<{
   }
 
   return {
-    persisted: true,
+    // Only the in-process memory copy exists here; nothing reached MongoDB Atlas.
+    persisted: false,
     documentId: graph.compileMeta.atlasDocumentId || `mem_${graph.sceneId}`,
     storageBackend: 'memory_replica',
   };
