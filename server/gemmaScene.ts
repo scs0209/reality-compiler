@@ -226,9 +226,9 @@ function summarizeZodError(err: z.ZodError, maxIssues = 4): string {
 }
 
 const COLOR_BY_EPISTEMIC: Record<EpistemicStatus, string> = {
-  observed: '#3b82f6',
-  inferred: '#f59e0b',
-  occluded_prior: '#f43f5e',
+  observed: '#5BB8C9',
+  inferred: '#FBBF24',
+  occluded_prior: '#DE8B4D',
 };
 
 const EDGE_MAX_GAP_CM = 80;

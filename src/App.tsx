@@ -6,18 +6,17 @@ import { EvidencePhotoPanel } from './components/EvidencePhotoPanel';
 import { TopDownCanvas } from './components/TopDownCanvas';
 import { WhatIfSimulatorPanel } from './components/WhatIfSimulatorPanel';
 import { PartnerStackPanels, type SentryStatus } from './components/PartnerStackPanels';
+import { KpiStrip } from './components/KpiStrip';
+import { EvidenceSidebar } from './components/EvidenceSidebar';
+import { SceneInspector } from './components/SceneInspector';
 import { useI18n, nodeLabel, presetCopy } from './i18n';
 import { downscaleImageDataUrl } from './imageUtils';
 import {
   AlertTriangle,
-  Cpu,
   Upload,
   Sparkles,
-  Trash2,
-  RotateCw,
   Layers,
-  Globe,
-  Server,
+  ScanSearch,
 } from 'lucide-react';
 
 export function App() {
@@ -63,6 +62,11 @@ export function App() {
   const [savingAtlas, setSavingAtlas] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [sentryStatus, setSentryStatus] = useState<SentryStatus | null>(null);
+  // Live readouts for the toolbar chips; null while unknown.
+  const [systemStatus, setSystemStatus] = useState<{
+    gemma: { model: string; state: 'ready' | 'no-model' | 'offline' } | null;
+    atlas: 'connected' | 'memory' | null;
+  }>({ gemma: null, atlas: null });
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -83,15 +87,31 @@ export function App() {
     setSelectedNodeId(nextGraph.nodes[0]?.id || null);
   };
 
-  const refreshSentryStatus = () => {
+  const refreshStatus = () => {
     fetch('/api/health')
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) => setSentryStatus(data?.partners?.sentryAgentTracing ?? null))
-      .catch(() => setSentryStatus(null));
+      .then((data) => {
+        setSentryStatus(data?.partners?.sentryAgentTracing ?? null);
+        const gemma = data?.partners?.gemma;
+        const atlas = data?.partners?.mongodbAtlas;
+        setSystemStatus({
+          gemma: gemma
+            ? {
+                model: String(gemma.model),
+                state: !gemma.ollamaReachable ? 'offline' : gemma.modelInstalled ? 'ready' : 'no-model',
+              }
+            : null,
+          atlas: atlas ? (atlas.status === 'connected_atlas' ? 'connected' : 'memory') : null,
+        });
+      })
+      .catch(() => {
+        setSentryStatus(null);
+        setSystemStatus({ gemma: null, atlas: null });
+      });
   };
 
   useEffect(() => {
-    refreshSentryStatus();
+    refreshStatus();
   }, []);
 
   useEffect(() => {
@@ -169,8 +189,8 @@ export function App() {
     } finally {
       setIsCompiling(false);
       // Spans are delivered in the background, so look again shortly after the compile.
-      refreshSentryStatus();
-      setTimeout(refreshSentryStatus, 3000);
+      refreshStatus();
+      setTimeout(refreshStatus, 3000);
     }
   };
 
@@ -315,7 +335,7 @@ export function App() {
       movable: true,
       weightKgEst: s.kg,
       disassemblyRequired: s.disassembly,
-      colorTag: '#38bdf8',
+      colorTag: '#22D3EE',
     };
 
     setRoomGraph((prev) => ({
@@ -347,72 +367,94 @@ export function App() {
     }
   };
 
+  const meta = roomGraph.compileMeta;
+  const sceneChip =
+    meta.runtime === 'fallback-preset'
+      ? { label: t('status.scene.fallback'), dot: 'bg-amber-400', className: 'border-amber-400/40 text-amber-300' }
+      : meta.runtime === 'preset-sample'
+        ? { label: t('status.scene.sample'), dot: 'bg-slate-500', className: '' }
+        : {
+            label: t('status.scene.compiled', { model: meta.model }),
+            dot: 'bg-emerald-400',
+            className: 'border-emerald-400/30 text-emerald-300',
+          };
+  const gemmaState = systemStatus.gemma?.state ?? null;
+  const gemmaDot =
+    gemmaState === 'ready'
+      ? 'bg-emerald-400'
+      : gemmaState === 'no-model'
+        ? 'bg-amber-400'
+        : gemmaState === 'offline'
+          ? 'bg-rose-400'
+          : 'bg-slate-600';
+  const gemmaTitle =
+    gemmaState === 'ready'
+      ? t('status.gemma.ready')
+      : gemmaState === 'no-model'
+        ? t('status.gemma.nomodel')
+        : gemmaState === 'offline'
+          ? t('status.gemma.offline')
+          : t('status.unknown');
+  const atlasDot =
+    systemStatus.atlas === 'connected'
+      ? 'bg-emerald-400'
+      : systemStatus.atlas === 'memory'
+        ? 'bg-amber-400'
+        : 'bg-slate-600';
+  const atlasLabel =
+    systemStatus.atlas === 'memory' ? t('status.atlas.memory') : t('status.atlas.connected');
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
-      {/* Top Header with Partner Stack Status */}
-      <header className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur border-b border-slate-800 px-4 py-2.5">
-        <div className="max-w-[1600px] mx-auto flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
-              <Layers className="w-5 h-5 text-white" />
+      {/* Floating toolbar: identity, current scene and its provenance, live system status */}
+      <header className="z-30 border-b border-slate-800 bg-slate-950/85 backdrop-blur-md md:sticky md:top-0">
+        <div className="mx-auto flex max-w-[1760px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md border border-sky-400/40 bg-slate-950 shadow-[0_0_14px_rgba(34,211,238,0.16)]">
+              <Layers className="h-4 w-4 text-sky-400" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-bold tracking-tight text-white">
-                  {t('app.title')}
-                </h1>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30">
-                  roomgraph.v1.2
-                </span>
-                <span className="hidden md:inline-block text-xs text-slate-400">
-                  {t('app.tagline')}
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-2 mt-0.5">
-                <span>{t('app.subtagline')}</span>
-              </div>
-            </div>
+            <h1 className="text-sm font-semibold tracking-tight text-slate-100">{t('app.title')}</h1>
+            <span className="chip border-sky-400/30 text-sky-300">roomgraph.v1.2</span>
           </div>
 
-          {/* Partner Stack Pills */}
-          <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
-            <span className="px-2 py-1 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-              <Cpu className="w-3 h-3" />
-              Gemma 3 (gemma3:4b)
+          <span className="hidden h-5 w-px bg-slate-700/70 md:block" aria-hidden="true" />
+
+          <div className="flex w-full min-w-0 items-center gap-2.5 md:w-auto md:max-w-[20rem] xl:max-w-[22rem] 2xl:max-w-[28rem]">
+            <span className="truncate text-xs text-slate-300" title={roomGraph.title}>
+              {roomGraph.title}
             </span>
-            <span className="px-2 py-1 rounded-md bg-sky-500/15 text-sky-300 border border-sky-500/30 flex items-center gap-1">
-              <Server className="w-3 h-3" />
-              DigitalOcean
+            <span className={`chip shrink-0 ${sceneChip.className}`}>
+              <i className={`h-1.5 w-1.5 rounded-full ${sceneChip.dot}`} />
+              {sceneChip.label}
             </span>
-            <span className="px-2 py-1 rounded-md bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 flex items-center gap-1">
-              <Globe className="w-3 h-3" />
-              realitycompiler.tech
+          </div>
+
+          <div className="ml-auto flex flex-wrap items-center gap-1.5">
+            <span className="chip" title={gemmaTitle}>
+              <i className={`h-1.5 w-1.5 rounded-full ${gemmaDot}`} />
+              {systemStatus.gemma?.model ?? 'gemma3:4b'}
             </span>
-            <span className="px-2 py-1 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-              MongoDB Atlas
+            <span className="chip" title={atlasLabel}>
+              <i className={`h-1.5 w-1.5 rounded-full ${atlasDot}`} />
+              {atlasLabel}
             </span>
             <span
+              className="chip"
               title={sentryStatus && !sentryStatus.enabled ? (sentryStatus.reason ?? undefined) : undefined}
-              className={`px-2 py-1 rounded-md border ${
-                sentryStatus?.enabled
-                  ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
-                  : 'bg-slate-800/60 text-slate-400 border-slate-700'
-              }`}
             >
+              <i
+                className={`h-1.5 w-1.5 rounded-full ${sentryStatus?.enabled ? 'bg-emerald-400' : 'bg-slate-600'}`}
+              />
               {sentryStatus === null
                 ? t('app.pill.sentryUnknown')
                 : sentryStatus.enabled
                   ? t('app.pill.sentry')
                   : t('app.pill.sentryOff')}
             </span>
-            <span className="px-2 py-1 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30">
-              {t('app.pill.entire')}
-            </span>
-            <button
-              type="button"
-              onClick={toggleLang}
-              className="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-sans font-semibold transition"
-            >
+            <span className="chip hidden 2xl:inline-flex">DigitalOcean</span>
+            <span className="chip hidden 2xl:inline-flex">realitycompiler.tech</span>
+            <span className="chip hidden 2xl:inline-flex">{t('app.pill.entire')}</span>
+            <button type="button" onClick={toggleLang} className="btn-secondary">
               {t('app.lang.toggle')}
             </button>
           </div>
@@ -421,28 +463,29 @@ export function App() {
 
       {/* Toast Notification */}
       {toastMsg && (
-        <div className="fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-xl bg-sky-600 text-white text-xs font-medium shadow-xl border border-sky-400 flex items-center gap-2">
-          <Sparkles className="w-4 h-4" />
+        <div className="glass fixed bottom-5 right-5 z-50 flex max-w-sm items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-medium text-slate-100">
+          <Sparkles className="h-4 w-4 shrink-0 text-sky-400" />
           <span>{toastMsg}</span>
         </div>
       )}
 
-      {/* Main 3-Column Compiler Workbench */}
-      <main className="flex-1 max-w-[1600px] w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* LEFT COLUMN (3 cols): Input Evidence, Calibration & Epistemic Object Inspector */}
-        <section className="lg:col-span-3 flex flex-col gap-3.5">
-          {/* Room Preset & Photo Upload Card */}
-          <div className="p-3.5 rounded-xl bg-slate-900/95 border border-slate-800 flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                {t('app.section.evidence')}
+      {/* Workstation: Source & Evidence | Spatial canvas + manifest | Scene Inspector */}
+      <main className="mx-auto grid w-full max-w-[1760px] flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-[16rem_minmax(0,1fr)] xl:grid-cols-[16rem_minmax(0,1fr)_19rem] 2xl:grid-cols-[19rem_minmax(0,1fr)_23rem]">
+        {/* LEFT: Source & Evidence */}
+        <aside className="order-2 flex min-w-0 flex-col gap-3 lg:order-1 lg:sticky lg:top-14 lg:max-h-[calc(100vh-4.5rem)] lg:self-start lg:overflow-y-auto">
+          <div className="panel flex flex-col divide-y divide-slate-800">
+            <div className="flex flex-col gap-3 p-3.5">
+              <h2 className="panel-title">
+                <ScanSearch className="h-4 w-4 text-sky-400" />
+                {t('panel.source')}
               </h2>
+
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium whitespace-nowrap shrink-0 transition"
+                className="btn-primary w-full py-2"
               >
-                <Upload className="w-3.5 h-3.5" />
+                <Upload className="h-3.5 w-3.5" />
                 {t('app.btn.upload')}
               </button>
               <input
@@ -452,220 +495,97 @@ export function App() {
                 onChange={handleUploadPhoto}
                 className="hidden"
               />
-            </div>
 
-            <div className="flex flex-col gap-1.5">
-              {PRESET_ROOMS.map((preset) => {
-                const active = selectedPresetId === preset.id;
-                const copy = presetCopy(preset, lang);
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => handleSelectPreset(preset.id)}
-                    className={`text-left p-2.5 rounded-lg border transition flex flex-col gap-1 ${
-                      active
-                        ? 'bg-sky-950/40 border-sky-500/50 text-slate-100'
-                        : 'bg-slate-950/70 border-slate-800/80 hover:border-slate-700 text-slate-300'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-1">
+              <div className="section-title">{t('app.section.evidence')}</div>
+              <div className="flex flex-col gap-1.5">
+                {PRESET_ROOMS.map((preset) => {
+                  const active = selectedPresetId === preset.id;
+                  const copy = presetCopy(preset, lang);
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handleSelectPreset(preset.id)}
+                      aria-pressed={active}
+                      className={`flex flex-col gap-1 rounded-md border p-2 text-left transition ${
+                        active
+                          ? 'border-sky-400/50 bg-sky-400/10 text-slate-100'
+                          : 'border-slate-800 bg-slate-950/50 text-slate-300 hover:border-slate-600'
+                      }`}
+                    >
                       <span className="text-xs font-semibold">{copy.name}</span>
-                    </div>
-                    <span className="text-[11px] text-slate-400">{copy.subtitle}</span>
-                    <div className="flex items-center justify-between mt-0.5">
-                      <span className="text-[10px] font-mono text-sky-400">
-                        {preset.roomType}
+                      <span className="text-[11px] leading-snug text-slate-400">{copy.subtitle}</span>
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-[10px] text-sky-400">{preset.roomType}</span>
+                        <span className="rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-[10px] text-slate-300">
+                          {copy.badge}
+                        </span>
                       </span>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-900 text-slate-300 border border-slate-800">
-                        {copy.badge}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Calibration Anchor Controls */}
-            <div className="pt-2 border-t border-slate-800 flex flex-col gap-2 text-xs">
-              <div className="text-[11px] font-semibold text-slate-300">
-                {t('app.calib.title')}
+                    </button>
+                  );
+                })}
               </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={calibrationObject}
-                  onChange={(e) => setCalibrationObject(e.target.value)}
-                  className="flex-1 px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-slate-200 text-xs"
-                />
-                <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded px-2">
+
+              {/* Calibration Anchor Controls */}
+              <div className="flex flex-col gap-2 border-t border-slate-800 pt-3 text-xs">
+                <div className="section-title">{t('app.calib.title')}</div>
+                <div className="flex gap-2">
                   <input
-                    type="number"
-                    value={calibrationCm}
-                    onChange={(e) => setCalibrationCm(Number(e.target.value))}
-                    className="w-12 bg-transparent text-right font-mono text-xs text-sky-300 focus:outline-none"
+                    type="text"
+                    value={calibrationObject}
+                    onChange={(e) => setCalibrationObject(e.target.value)}
+                    className="min-w-0 flex-1 rounded-md border border-slate-800 bg-slate-950 px-2.5 py-1.5 text-xs text-slate-200"
                   />
-                  <span className="text-[10px] text-slate-500 font-mono">cm</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                disabled={isCompiling || !uploadedPhoto}
-                title={uploadedPhoto ? undefined : t('app.btn.recompileHint')}
-                onClick={() => uploadedPhoto && compilePhoto(uploadedPhoto)}
-                className="w-full py-2 rounded-lg bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 disabled:opacity-50 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                {isCompiling ? t('app.btn.compiling') : t('app.btn.recompile')}
-              </button>
-            </div>
-          </div>
-
-          {/* Epistemic Uncertainty Breakdown (Observed vs Inferred vs Occluded) */}
-          <div className="p-3.5 rounded-xl bg-slate-900/95 border border-slate-800 flex flex-col gap-2.5 flex-1">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                {t('app.section.epistemic')}
-              </h2>
-              <span className="text-xs font-mono text-emerald-400">
-                {t('app.meanConf', { pct: Math.round(roomGraph.epistemicSummary.overallConfidence * 100) })}
-              </span>
-            </div>
-
-            {/* Filter Chips */}
-            <div className="grid grid-cols-4 gap-1 text-[11px]">
-              <button
-                type="button"
-                onClick={() => setEpistemicFilter('all')}
-                className={`py-1 rounded border font-medium ${
-                  epistemicFilter === 'all'
-                    ? 'bg-slate-800 text-white border-slate-600'
-                    : 'bg-slate-950 text-slate-400 border-slate-800'
-                }`}
-              >
-                {t('app.filter.all', { n: roomGraph.nodes.length })}
-              </button>
-              <button
-                type="button"
-                onClick={() => setEpistemicFilter('observed')}
-                className={`py-1 rounded border font-medium ${
-                  epistemicFilter === 'observed'
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                    : 'bg-slate-950 text-emerald-400/70 border-slate-800'
-                }`}
-              >
-                {t('app.filter.obs', { n: roomGraph.nodes.filter((n) => n.epistemic === 'observed').length })}
-              </button>
-              <button
-                type="button"
-                onClick={() => setEpistemicFilter('inferred')}
-                className={`py-1 rounded border font-medium ${
-                  epistemicFilter === 'inferred'
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                    : 'bg-slate-950 text-amber-400/70 border-slate-800'
-                }`}
-              >
-                {t('app.filter.inf', { n: roomGraph.nodes.filter((n) => n.epistemic === 'inferred').length })}
-              </button>
-              <button
-                type="button"
-                onClick={() => setEpistemicFilter('occluded_prior')}
-                className={`py-1 rounded border font-medium ${
-                  epistemicFilter === 'occluded_prior'
-                    ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                    : 'bg-slate-950 text-rose-400/70 border-slate-800'
-                }`}
-              >
-                {t('app.filter.occ', { n: roomGraph.nodes.filter((n) => n.epistemic === 'occluded_prior').length })}
-              </button>
-            </div>
-
-            {/* Object List */}
-            <div className="flex flex-col gap-2 max-h-[340px] overflow-y-auto pr-1">
-              {filteredNodes.map((node) => {
-                const isSelected = selectedNodeId === node.id;
-                const uncSum =
-                  node.uncertainty.posPlusMinusCm + node.uncertainty.dimPlusMinusCm;
-                return (
-                  <div
-                    key={node.id}
-                    onClick={() => setSelectedNodeId(node.id)}
-                    className={`p-2.5 rounded-lg border text-xs cursor-pointer transition ${
-                      isSelected
-                        ? 'bg-sky-950/40 border-sky-500/60'
-                        : 'bg-slate-950/80 border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="font-semibold text-slate-100">{nodeLabel(node, lang)}</span>
-                      <span
-                        className={`px-1.5 py-0.5 rounded text-[10px] font-mono border ${
-                          node.epistemic === 'observed'
-                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                            : node.epistemic === 'inferred'
-                            ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                            : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
-                        }`}
-                      >
-                        {node.epistemic === 'observed' && t('badge.observed')}
-                        {node.epistemic === 'inferred' && t('badge.inferred')}
-                        {node.epistemic === 'occluded_prior' && t('badge.occluded')} ·{' '}
-                        {Math.round(node.confidence * 100)}%
-                      </span>
-                    </div>
-                    <div className="text-[11px] font-mono text-slate-400 mt-1">
-                      {t('app.size', { w: node.footprint.widthCm, d: node.footprint.depthCm, h: node.footprint.heightCm, u: uncSum })}
-                    </div>
-                    <p className="text-[11px] text-slate-300/90 mt-1 leading-snug">
-                      {node.evidenceSource}
-                    </p>
+                  <div className="flex items-center gap-1 rounded-md border border-slate-800 bg-slate-950 px-2">
+                    <input
+                      type="number"
+                      value={calibrationCm}
+                      onChange={(e) => setCalibrationCm(Number(e.target.value))}
+                      className="w-12 bg-transparent text-right font-mono text-xs text-sky-300 focus:outline-none"
+                    />
+                    <span className="font-mono text-[10px] text-slate-500">cm</span>
                   </div>
-                );
-              })}
+                </div>
+                <button
+                  type="button"
+                  disabled={isCompiling || !uploadedPhoto}
+                  title={uploadedPhoto ? undefined : t('app.btn.recompileHint')}
+                  onClick={() => uploadedPhoto && compilePhoto(uploadedPhoto)}
+                  className="btn-secondary w-full py-2"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {isCompiling ? t('app.btn.compiling') : t('app.btn.recompile')}
+                </button>
+                {!uploadedPhoto && (
+                  <p className="text-[11px] leading-snug text-slate-500">{t('app.btn.recompileHint')}</p>
+                )}
+              </div>
             </div>
 
-            {/* Selected Node Action Bar */}
-            {selectedNode && (
-              <div className="mt-auto pt-2.5 border-t border-slate-800 flex items-center justify-between text-xs">
-                <span className="text-slate-300 font-medium truncate">
-                  {t('app.selected')} <strong className="text-sky-300">{nodeLabel(selectedNode, lang)}</strong>
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => handleRotateNode(selectedNode.id)}
-                    className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
-                    title={t('app.rotateTitle')}
-                  >
-                    <RotateCw className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteNode(selectedNode.id)}
-                    className="p-1.5 rounded bg-rose-950/60 hover:bg-rose-900/70 text-rose-300 border border-rose-500/30"
-                    title={t('app.removeTitle')}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            )}
+            <EvidenceSidebar
+              graph={roomGraph}
+              filter={epistemicFilter}
+              onFilter={setEpistemicFilter}
+              filteredNodes={filteredNodes}
+              selectedNodeId={selectedNodeId}
+              onSelectNode={setSelectedNodeId}
+            />
           </div>
-        </section>
+        </aside>
 
-        {/* CENTER COLUMN (5 cols): Source Photo Overlay + Interactive 3D / 2D Spatial Viewer */}
-        <section className="lg:col-span-5 flex flex-col gap-3.5">
+        {/* CENTER: summary, spatial canvas, source photo, manifest */}
+        <section className="order-1 flex min-w-0 flex-col gap-3 lg:order-2">
           {isCompiling && (
-            <div className="p-3 rounded-xl bg-sky-950/50 border border-sky-500/40 text-sky-200 text-xs">
+            <div className="rounded-xl border border-sky-400/40 bg-sky-950/40 p-3 text-xs text-sky-200">
               {t('app.compiling.note')}
             </div>
           )}
           {roomGraph.compileMeta.fallback && (
             <div
               role="alert"
-              className="flex items-start gap-2 p-3 rounded-xl bg-amber-950/60 border border-amber-500/50 text-amber-100 text-xs"
+              className="flex items-start gap-2 rounded-xl border border-amber-500/50 bg-amber-950/60 p-3 text-xs text-amber-100"
             >
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
               <div className="flex flex-col gap-0.5">
                 <div className="font-semibold">{t('app.fallback.title')}</div>
                 <div className="text-amber-200/90">
@@ -677,13 +597,8 @@ export function App() {
               </div>
             </div>
           )}
-          <EvidencePhotoPanel
-            graph={roomGraph}
-            selectedNodeId={selectedNodeId}
-            onSelectNode={setSelectedNodeId}
-            showBBoxOverlay={showBBoxOverlay}
-            onToggleBBoxOverlay={() => setShowBBoxOverlay((v) => !v)}
-          />
+
+          <KpiStrip graph={roomGraph} />
 
           <TopDownCanvas
             graph={roomGraph}
@@ -697,22 +612,13 @@ export function App() {
             showRelationEdges={showRelationEdges}
             onToggleRelationEdges={() => setShowRelationEdges((v) => !v)}
           />
-        </section>
 
-        {/* RIGHT COLUMN (4 cols): Moving What-If Simulator + RoomGraph JSON / Sentry / Atlas / Entire */}
-        <section className="lg:col-span-4 flex flex-col gap-3.5">
-          <WhatIfSimulatorPanel
+          <EvidencePhotoPanel
             graph={roomGraph}
-            report={whatIfReport}
-            doorWidthOverrideCm={doorWidthOverrideCm}
-            onChangeDoorWidth={setDoorWidthOverrideCm}
-            minWalkwayCm={minWalkwayCm}
-            onChangeMinWalkway={setMinWalkwayCm}
-            onSelectNode={(id) => setSelectedNodeId(id)}
-            onResetLayout={() => {
-              applyNewRoomGraph(baseGraph);
-              showToast(t('app.toast.reset'));
-            }}
+            selectedNodeId={selectedNodeId}
+            onSelectNode={setSelectedNodeId}
+            showBBoxOverlay={showBBoxOverlay}
+            onToggleBBoxOverlay={() => setShowBBoxOverlay((v) => !v)}
           />
 
           <PartnerStackPanels
@@ -729,6 +635,31 @@ export function App() {
             savingAtlas={savingAtlas}
           />
         </section>
+
+        {/* RIGHT: Scene Inspector and the moving what-if check */}
+        <aside className="order-3 flex min-w-0 flex-col gap-3 lg:col-span-2 lg:grid lg:grid-cols-2 lg:items-start xl:col-span-1 xl:flex xl:items-stretch xl:sticky xl:top-14 xl:max-h-[calc(100vh-4.5rem)] xl:self-start xl:overflow-y-auto">
+          <SceneInspector
+            graph={roomGraph}
+            node={selectedNode}
+            onSelectNode={setSelectedNodeId}
+            onRotateNode={handleRotateNode}
+            onDeleteNode={handleDeleteNode}
+          />
+
+          <WhatIfSimulatorPanel
+            graph={roomGraph}
+            report={whatIfReport}
+            doorWidthOverrideCm={doorWidthOverrideCm}
+            onChangeDoorWidth={setDoorWidthOverrideCm}
+            minWalkwayCm={minWalkwayCm}
+            onChangeMinWalkway={setMinWalkwayCm}
+            onSelectNode={(id) => setSelectedNodeId(id)}
+            onResetLayout={() => {
+              applyNewRoomGraph(baseGraph);
+              showToast(t('app.toast.reset'));
+            }}
+          />
+        </aside>
       </main>
     </div>
   );

@@ -86,10 +86,10 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
   const totalDuration = graph.compileMeta.latencyMs || 1;
 
   return (
-    <div className="flex flex-col bg-slate-900/95 border border-slate-800 rounded-xl overflow-hidden">
+    <div className="panel flex flex-col overflow-hidden">
       {/* Sub-navigation */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-slate-900 border-b border-slate-800 text-xs">
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           <button
             type="button"
             onClick={() => setSubTab('json')}
@@ -173,7 +173,7 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
               <button
                 type="button"
                 onClick={handleDownloadJson}
-                className="flex items-center gap-1 px-2.5 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white font-medium transition"
+                className="btn-primary"
               >
                 <Download className="w-3.5 h-3.5" />
                 .roomgraph.json
@@ -181,7 +181,7 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
               <button
                 type="button"
                 onClick={handleDownloadCsv}
-                className="flex items-center gap-1 px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition"
+                className="btn-secondary"
               >
                 <Download className="w-3.5 h-3.5" />
                 {t('partner.json.csv')}
@@ -261,7 +261,7 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
 
           <div className="flex flex-col gap-2">
             {graph.compileMeta.spans.length > 0 && (
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <div className="panel-label">
                 {t('partner.sentry.waterfall')}
               </div>
             )}
@@ -294,7 +294,7 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
                         width: `${widthPct}%`,
                         marginLeft: `${Math.min(100 - widthPct, leftPct)}%`,
                       }}
-                      className="h-full rounded-full bg-gradient-to-r from-purple-500 to-sky-400"
+                      className="h-full rounded-full bg-sky-400"
                     />
                   </div>
                   <div className="flex flex-wrap gap-1.5 pt-0.5">
@@ -331,7 +331,7 @@ export const PartnerStackPanels: React.FC<PartnerStackPanelsProps> = ({
               type="button"
               onClick={onSaveToAtlas}
               disabled={savingAtlas}
-              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-medium transition"
+              className="btn-primary px-3 py-1.5"
             >
               {savingAtlas ? t('partner.atlas.saving') : t('partner.atlas.upsert')}
             </button>

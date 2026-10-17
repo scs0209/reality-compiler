@@ -35,7 +35,7 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
   return (
     <div className="flex flex-col gap-3">
       {/* Top Status Banner */}
-      <div className="p-3.5 rounded-xl bg-slate-900/95 border border-slate-800 flex flex-col gap-3">
+      <div className="panel flex flex-col gap-3 p-3.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <div className="text-xs uppercase tracking-wider text-sky-400 font-mono">
@@ -139,7 +139,7 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
               onChange={(e) => onChangeDoorWidth(Number(e.target.value))}
               className="w-full accent-sky-500 cursor-pointer"
             />
-            <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+            <div className="flex flex-wrap justify-between gap-x-2 gap-y-0.5 text-[10px] text-slate-500 font-mono">
               <span>{t('whatif.door.walkup')}</span>
               <span>{t('whatif.door.standard')}</span>
               <span>{t('whatif.door.wide')}</span>
@@ -164,7 +164,7 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
               onChange={(e) => onChangeMinWalkway(Number(e.target.value))}
               className="w-full accent-indigo-500 cursor-pointer"
             />
-            <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+            <div className="flex flex-wrap justify-between gap-x-2 gap-y-0.5 text-[10px] text-slate-500 font-mono">
               <span>{t('whatif.walk.tight')}</span>
               <span>{t('whatif.walk.standard')}</span>
               <span>{t('whatif.walk.ada')}</span>
@@ -174,9 +174,9 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
       </div>
 
       {/* Violations & Epistemic Warnings List */}
-      <div className="p-3.5 rounded-xl bg-slate-900/95 border border-slate-800 flex flex-col gap-2">
+      <div className="panel flex flex-col gap-2 p-3.5">
         <div className="flex items-center justify-between">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+          <h4 className="panel-label">
             {t('whatif.alerts', { n: report.violations.length })}
           </h4>
           <span className="text-[11px] text-slate-400">{t('whatif.clickHighlight')}</span>
@@ -227,8 +227,8 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
       </div>
 
       {/* Door Bottleneck Matrix */}
-      <div className="p-3.5 rounded-xl bg-slate-900/95 border border-slate-800 flex flex-col gap-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+      <div className="panel flex flex-col gap-2 p-3.5">
+        <h4 className="panel-label">
           {t('whatif.matrix', { w: doorWidthOverrideCm })}
         </h4>
         <div className="overflow-x-auto">
@@ -280,7 +280,7 @@ export const WhatIfSimulatorPanel: React.FC<WhatIfSimulatorPanelProps> = ({
       </div>
 
       {/* Rule-based Moving Logistics & Cost Estimate Module */}
-      <div className="p-3.5 rounded-xl bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 border border-indigo-500/30 flex flex-col gap-2.5">
+      <div className="panel flex flex-col gap-2.5 p-3.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <Truck className="w-4 h-4 text-indigo-400" />

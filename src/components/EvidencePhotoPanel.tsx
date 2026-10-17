@@ -2,6 +2,7 @@ import React from 'react';
 import type { RoomGraph, RoomObjectNode } from '../../shared/roomGraphSchema';
 import { Eye, Sparkles, Compass } from 'lucide-react';
 import { useI18n, nodeLabel } from '../i18n';
+import { ToggleChip } from './ToggleChip';
 
 interface EvidencePhotoPanelProps {
   graph: RoomGraph;
@@ -26,11 +27,11 @@ export const EvidencePhotoPanel: React.FC<EvidencePhotoPanelProps> = ({
     if (epistemic === 'inferred') {
       return 'border-amber-400 bg-amber-500/20 text-amber-200';
     }
-    return 'border-rose-400 bg-rose-500/25 text-rose-200';
+    return 'border-orange-400 bg-orange-500/25 text-orange-200';
   };
 
   return (
-    <div className="flex flex-col bg-slate-900/90 border border-slate-800 rounded-xl overflow-hidden">
+    <div className="panel flex flex-col overflow-hidden">
       <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-900 border-b border-slate-800 text-xs">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-sky-400" />
@@ -38,18 +39,10 @@ export const EvidencePhotoPanel: React.FC<EvidencePhotoPanelProps> = ({
             {t('evidence.title')}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={onToggleBBoxOverlay}
-          className={`flex items-center gap-1 px-2.5 py-1 rounded border text-xs font-medium transition ${
-            showBBoxOverlay
-              ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
-              : 'bg-slate-800 text-slate-400 border-slate-700'
-          }`}
-        >
-          <Eye className="w-3.5 h-3.5" />
-          {t('evidence.overlay')} {showBBoxOverlay ? t('state.on') : t('state.off')}
-        </button>
+        <ToggleChip on={showBBoxOverlay} onClick={onToggleBBoxOverlay}>
+          <Eye className="h-3.5 w-3.5" />
+          {t('evidence.overlay')}
+        </ToggleChip>
       </div>
 
       {/* Image Container with Normalized BBox Overlay */}
@@ -75,7 +68,7 @@ export const EvidencePhotoPanel: React.FC<EvidencePhotoPanelProps> = ({
                 ? 'border-emerald-400 border-solid'
                 : node.epistemic === 'inferred'
                 ? 'border-amber-400 border-dashed'
-                : 'border-rose-400 border-dotted';
+                : 'border-orange-400 border-dotted';
 
             return (
               <div

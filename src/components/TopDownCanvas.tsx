@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import type { RoomGraph, RoomObjectNode } from '../../shared/roomGraphSchema';
 import { getNodeRect } from '../../shared/spatialEngine';
 import { useI18n, nodeLabel } from '../i18n';
+import { ToggleChip } from './ToggleChip';
 import {
   RotateCw,
   Plus,
@@ -110,38 +111,39 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
     setOrbitDragging(false);
   };
 
+  // Evidence palette: observed = muted cyan, estimated = amber, low-confidence = muted orange.
   const epistemicStyle = (status: RoomObjectNode['epistemic']) => {
     if (status === 'observed') {
       return {
-        stroke: '#10b981',
-        fill: 'rgba(16, 185, 129, 0.22)',
-        topFill: 'rgba(16, 185, 129, 0.36)',
-        sideFill: 'rgba(5, 150, 105, 0.24)',
-        haloFill: 'rgba(16, 185, 129, 0.08)',
-        haloStroke: '#34d399',
+        stroke: '#5BB8C9',
+        fill: 'rgba(91, 184, 201, 0.20)',
+        topFill: 'rgba(91, 184, 201, 0.34)',
+        sideFill: 'rgba(44, 125, 143, 0.26)',
+        haloFill: 'rgba(91, 184, 201, 0.07)',
+        haloStroke: '#8FD3DE',
         dash: undefined,
         badge: 'OBSERVED',
       };
     }
     if (status === 'inferred') {
       return {
-        stroke: '#f59e0b',
-        fill: 'rgba(245, 158, 11, 0.22)',
-        topFill: 'rgba(245, 158, 11, 0.04)',
-        sideFill: 'rgba(217, 119, 6, 0.02)',
-        haloFill: 'rgba(245, 158, 11, 0.12)',
-        haloStroke: '#fbbf24',
+        stroke: '#FBBF24',
+        fill: 'rgba(251, 191, 36, 0.18)',
+        topFill: 'rgba(251, 191, 36, 0.04)',
+        sideFill: 'rgba(180, 130, 20, 0.02)',
+        haloFill: 'rgba(251, 191, 36, 0.12)',
+        haloStroke: '#FCD34D',
         dash: '6,4',
         badge: 'INFERRED',
       };
     }
     return {
-      stroke: '#f43f5e',
-      fill: 'rgba(244, 63, 94, 0.22)',
-      topFill: 'rgba(244, 63, 94, 0.04)',
-      sideFill: 'rgba(225, 29, 72, 0.02)',
-      haloFill: 'rgba(244, 63, 94, 0.15)',
-      haloStroke: '#fb7185',
+      stroke: '#DE8B4D',
+      fill: 'rgba(222, 139, 77, 0.20)',
+      topFill: 'rgba(222, 139, 77, 0.04)',
+      sideFill: 'rgba(166, 92, 46, 0.02)',
+      haloFill: 'rgba(222, 139, 77, 0.14)',
+      haloStroke: '#E9A777',
       dash: '4,4',
       badge: 'OCCLUDED PRIOR',
     };
@@ -282,18 +284,18 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
   });
 
   return (
-    <div className="flex flex-col bg-slate-900/90 border border-slate-800 rounded-xl overflow-hidden">
+    <div className="panel flex flex-col overflow-hidden">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 bg-slate-900 border-b border-slate-800 text-xs">
         <div className="flex items-center gap-2">
           {/* 2D vs 3D Mode Switcher */}
-          <div className="inline-flex rounded-lg bg-slate-950 p-0.5 border border-slate-800">
+          <div className="inline-flex rounded-full border border-slate-800 bg-slate-950 p-0.5">
             <button
               type="button"
               onClick={() => setViewMode('3d')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition ${
+              className={`flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold transition ${
                 viewMode === '3d'
-                  ? 'bg-sky-600 text-white shadow'
+                  ? 'bg-sky-400 text-slate-950'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -303,9 +305,9 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
             <button
               type="button"
               onClick={() => setViewMode('2d')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition ${
+              className={`flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold transition ${
                 viewMode === '2d'
-                  ? 'bg-sky-600 text-white shadow'
+                  ? 'bg-sky-400 text-slate-950'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -313,7 +315,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
               {t('canvas.mode2d')}
             </button>
           </div>
-          <span className="px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30 font-mono whitespace-nowrap">
+          <span className="hidden whitespace-nowrap rounded border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 font-mono text-sky-300 sm:inline-block">
             {viewMode === '3d'
               ? t('canvas.hint3d', { yaw: Math.round(yawDeg), pitch: Math.round(pitchDeg) })
               : t('canvas.hint2d')}
@@ -321,33 +323,17 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
-          <button
-            type="button"
-            onClick={onToggleUncertaintyHalo}
-            className={`px-2.5 py-1 rounded border text-xs font-medium transition ${
-              showUncertaintyHalo
-                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                : 'bg-slate-800 text-slate-400 border-slate-700'
-            }`}
-          >
-            {t('canvas.shell')} {showUncertaintyHalo ? t('state.on') : t('state.off')}
-          </button>
-          <button
-            type="button"
-            onClick={onToggleRelationEdges}
-            className={`px-2.5 py-1 rounded border text-xs font-medium transition ${
-              showRelationEdges
-                ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
-                : 'bg-slate-800 text-slate-400 border-slate-700'
-            }`}
-          >
-            {t('canvas.relationEdges')} {showRelationEdges ? t('state.on') : t('state.off')}
-          </button>
+          <ToggleChip on={showUncertaintyHalo} onClick={onToggleUncertaintyHalo}>
+            {t('canvas.shell')}
+          </ToggleChip>
+          <ToggleChip on={showRelationEdges} onClick={onToggleRelationEdges}>
+            {t('canvas.relationEdges')}
+          </ToggleChip>
           {selectedNodeId && (
             <button
               type="button"
               onClick={() => onRotateNode(selectedNodeId)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white font-medium transition"
+              className="btn-primary"
             >
               <RotateCw className="w-3.5 h-3.5" />
               {t('canvas.rotate90')}
@@ -367,7 +353,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
               {t('canvas.why.p2')}{' '}
               <span className="text-amber-300 font-semibold">{t('canvas.why.inf')}</span>{' '}
               {t('canvas.why.p3')}{' '}
-              <span className="text-rose-300 font-semibold">{t('canvas.why.occ')}</span>{' '}
+              <span className="text-orange-300 font-semibold">{t('canvas.why.occ')}</span>{' '}
               {t('canvas.why.p4')} <code>±cm</code> {t('canvas.why.p5')}
             </span>
           </div>
@@ -413,11 +399,11 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
       </div>
 
       {/* Canvas Viewport: 3D Volumetric Wireframe OR 2D Metric Blueprint */}
-      <div className="relative flex-1 flex items-center justify-center p-3 bg-slate-950 select-none">
+      <div className="relative flex min-h-[320px] flex-1 select-none items-center justify-center bg-slate-950 p-3 lg:min-h-[480px]">
         {viewMode === '3d' ? (
           <svg
             viewBox={`0 0 ${isoW} ${isoH}`}
-            className="w-full max-h-[430px] touch-none cursor-grab active:cursor-grabbing"
+            className="w-full max-h-[620px] touch-none cursor-grab active:cursor-grabbing"
             onPointerDown={(e) => {
               setOrbitDragging(true);
               setOrbitStart({
@@ -452,7 +438,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                     y1={pA.y}
                     x2={pB.x}
                     y2={pB.y}
-                    stroke="rgba(148,163,184,0.12)"
+                    stroke="rgba(142,160,181,0.12)"
                     strokeWidth="1"
                   />
                 );
@@ -467,7 +453,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                     y1={pA.y}
                     x2={pB.x}
                     y2={pB.y}
-                    stroke="rgba(148,163,184,0.12)"
+                    stroke="rgba(142,160,181,0.12)"
                     strokeWidth="1"
                   />
                 );
@@ -478,28 +464,28 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                   {/* Back North & West Walls */}
                   <polygon
                     points={polyPoints([f0, f1, c1, c0])}
-                    fill="rgba(30, 41, 59, 0.45)"
-                    stroke="#475569"
+                    fill="rgba(36, 50, 68, 0.45)"
+                    stroke="#475A6F"
                     strokeWidth="1.5"
                   />
                   <polygon
                     points={polyPoints([f0, f3, c3, c0])}
-                    fill="rgba(15, 23, 42, 0.55)"
-                    stroke="#475569"
+                    fill="rgba(11, 16, 23, 0.55)"
+                    stroke="#475A6F"
                     strokeWidth="1.5"
                   />
                   {/* Floor Plane */}
                   <polygon
                     points={polyPoints([f0, f1, f2, f3])}
-                    fill="rgba(15, 23, 42, 0.9)"
-                    stroke="#64748b"
+                    fill="rgba(11, 16, 23, 0.9)"
+                    stroke="#74869C"
                     strokeWidth="2.5"
                   />
                   {gridLines}
                   <text
                     x={c0.x}
                     y={c0.y - 10}
-                    fill="#94a3b8"
+                    fill="#8EA0B5"
                     fontSize="11"
                     fontFamily="JetBrains Mono, monospace"
                   >
@@ -528,7 +514,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                       y1={pA.y}
                       x2={pB.x}
                       y2={pB.y}
-                      stroke="#818cf8"
+                      stroke="#8197BD"
                       strokeWidth="1.8"
                       strokeDasharray="4,3"
                     />
@@ -538,14 +524,14 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                       width={84}
                       height={17}
                       rx="4"
-                      fill="#1e1b4b"
-                      stroke="#6366f1"
+                      fill="#161E2C"
+                      stroke="#637CA6"
                     />
                     <text
                       x={mx}
                       y={my + 3}
                       textAnchor="middle"
-                      fill="#c7d2fe"
+                      fill="#C5D1E6"
                       fontSize="8.5"
                       fontFamily="JetBrains Mono, monospace"
                     >
@@ -603,7 +589,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                     rect.d,
                     node.footprint.heightCm,
                     {
-                      stroke: isSelected ? '#38bdf8' : st.stroke,
+                      stroke: isSelected ? '#22D3EE' : st.stroke,
                       topFill: st.topFill,
                       sideFill: st.sideFill,
                       dash: st.dash,
@@ -618,15 +604,15 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                     width={116}
                     height={26}
                     rx="4"
-                    fill="rgba(15, 23, 42, 0.88)"
-                    stroke={isSelected ? '#38bdf8' : st.stroke}
+                    fill="rgba(11, 16, 23, 0.88)"
+                    stroke={isSelected ? '#22D3EE' : st.stroke}
                     strokeWidth="1"
                   />
                   <text
                     x={roofCenter.x}
                     y={roofCenter.y - 6}
                     textAnchor="middle"
-                    fill="#f8fafc"
+                    fill="#E6EDF5"
                     fontSize="9.5"
                     fontWeight="600"
                   >
@@ -650,7 +636,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
           <svg
             ref={svgRef}
             viewBox={`0 0 ${viewW} ${viewD}`}
-            className="w-full max-h-[430px] touch-none cursor-crosshair"
+            className="w-full max-h-[620px] touch-none cursor-crosshair"
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerLeave={handlePointerUp}
@@ -661,7 +647,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                 <path
                   d="M 50 0 L 0 0 0 50"
                   fill="none"
-                  stroke="rgba(148, 163, 184, 0.12)"
+                  stroke="rgba(142, 160, 181, 0.12)"
                   strokeWidth="1"
                 />
               </pattern>
@@ -669,7 +655,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                 <path
                   d="M 10 0 L 0 0 0 10"
                   fill="none"
-                  stroke="rgba(148, 163, 184, 0.04)"
+                  stroke="rgba(142, 160, 181, 0.04)"
                   strokeWidth="0.5"
                 />
               </pattern>
@@ -695,8 +681,8 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                 y={0}
                 width={envW}
                 height={envD}
-                fill="#0f172a"
-                stroke="#64748b"
+                fill="#0B1017"
+                stroke="#74869C"
                 strokeWidth="4"
               />
               <rect x={0} y={0} width={envW} height={envD} fill="url(#grid10)" />
@@ -706,7 +692,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                 x={envW / 2}
                 y={-12}
                 textAnchor="middle"
-                fill="#94a3b8"
+                fill="#8EA0B5"
                 fontSize="11"
                 fontFamily="JetBrains Mono, monospace"
               >
@@ -716,7 +702,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                 x={-14}
                 y={envD / 2}
                 textAnchor="middle"
-                fill="#94a3b8"
+                fill="#8EA0B5"
                 fontSize="11"
                 fontFamily="JetBrains Mono, monospace"
                 transform={`rotate(-90, -14, ${envD / 2})`}
@@ -732,14 +718,14 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                     width={110}
                     height={34}
                     rx="4"
-                    fill="rgba(244, 63, 94, 0.10)"
-                    stroke="rgba(244, 63, 94, 0.45)"
+                    fill="rgba(222, 139, 77, 0.10)"
+                    stroke="rgba(222, 139, 77, 0.45)"
                     strokeDasharray="3,3"
                   />
                   <text
                     x={18}
                     y={envD - 60 - idx * 45}
-                    fill="#fda4af"
+                    fill="#E9A777"
                     fontSize="8.5"
                     fontFamily="JetBrains Mono, monospace"
                   >
@@ -750,7 +736,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
 
               {graph.roomEnvelope.openings.map((op) => {
                 const isDoor = op.kind === 'entry_door' || op.kind === 'balcony_door';
-                const strokeColor = isDoor ? '#38bdf8' : '#7dd3fc';
+                const strokeColor = isDoor ? '#22D3EE' : '#67E8F9';
                 if (op.wall === 'south') {
                   return (
                     <g key={op.id}>
@@ -765,8 +751,8 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                       {op.swingClearanceCm > 0 && (
                         <path
                           d={`M ${op.offsetCm} ${envD} L ${op.offsetCm} ${envD - op.swingClearanceCm} A ${op.widthCm} ${op.swingClearanceCm} 0 0 1 ${op.offsetCm + op.widthCm} ${envD}`}
-                          fill="rgba(56, 189, 248, 0.12)"
-                          stroke="#38bdf8"
+                          fill="rgba(34, 211, 238, 0.12)"
+                          stroke="#22D3EE"
                           strokeWidth="1.5"
                           strokeDasharray="4,3"
                         />
@@ -775,7 +761,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                         x={op.offsetCm + op.widthCm / 2}
                         y={envD + 18}
                         textAnchor="middle"
-                        fill="#38bdf8"
+                        fill="#22D3EE"
                         fontSize="10"
                         fontFamily="JetBrains Mono, monospace"
                       >
@@ -799,7 +785,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                         x={op.offsetCm + op.widthCm / 2}
                         y={14}
                         textAnchor="middle"
-                        fill="#7dd3fc"
+                        fill="#67E8F9"
                         fontSize="9.5"
                         fontFamily="JetBrains Mono, monospace"
                       >
@@ -827,7 +813,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                         y1={rA.cy}
                         x2={rB.cx}
                         y2={rB.cy}
-                        stroke="#818cf8"
+                        stroke="#8197BD"
                         strokeWidth="1.8"
                         strokeDasharray="4,3"
                       />
@@ -837,15 +823,15 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                         width={72}
                         height={18}
                         rx="4"
-                        fill="#1e1b4b"
-                        stroke="#6366f1"
+                        fill="#161E2C"
+                        stroke="#637CA6"
                         strokeWidth="1"
                       />
                       <text
                         x={mx}
                         y={my + 3}
                         textAnchor="middle"
-                        fill="#c7d2fe"
+                        fill="#C5D1E6"
                         fontSize="8.5"
                         fontFamily="JetBrains Mono, monospace"
                       >
@@ -894,7 +880,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                       height={rect.d}
                       rx="4"
                       fill={st.fill}
-                      stroke={isSelected ? '#38bdf8' : st.stroke}
+                      stroke={isSelected ? '#22D3EE' : st.stroke}
                       strokeWidth={isSelected ? '3' : '2'}
                       strokeDasharray={st.dash}
                     />
@@ -903,7 +889,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                       x={rect.cx}
                       y={rect.cy - 4}
                       textAnchor="middle"
-                      fill="#f8fafc"
+                      fill="#E6EDF5"
                       fontSize="10.5"
                       fontWeight="600"
                     >
@@ -913,7 +899,7 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
                       x={rect.cx}
                       y={rect.cy + 10}
                       textAnchor="middle"
-                      fill="#cbd5e1"
+                      fill="#A9B8C9"
                       fontSize="8.5"
                       fontFamily="JetBrains Mono, monospace"
                     >
@@ -949,8 +935,8 @@ export const TopDownCanvas: React.FC<TopDownCanvasProps> = ({
             <strong className="text-amber-300">{t('canvas.legend.inferred')}</strong> {t('canvas.legend.inferredDesc')}
           </span>
           <span className="flex items-center gap-1.5">
-            <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
-            <strong className="text-rose-300">{t('canvas.legend.occluded')}</strong> {t('canvas.legend.occludedDesc')}
+            <ShieldAlert className="w-3.5 h-3.5 text-orange-400" />
+            <strong className="text-orange-300">{t('canvas.legend.occluded')}</strong> {t('canvas.legend.occludedDesc')}
           </span>
         </div>
         <div className="flex items-center gap-1 text-sky-300 font-mono">
