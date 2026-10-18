@@ -29,8 +29,10 @@ Open items. The post does not claim anything that is still unverified:
 6. Sentry: done. Six real compiles were sent (HTTP 200, no failures) and three screenshots from Sentry's Agents view
    and trace details are in the post (docs/post-images/sentry). The Sentry project also holds unrelated issues from
    another app: do not screenshot its Issues feed or the project switcher.
-7. MongoDB Atlas: connected to a real cluster, and a compile was stored there. Take a screenshot of the collection
-   for the post. Note that stored documents include the source photo.
+7. MongoDB Atlas: done. Connected to a real cluster (11 documents); the post shows the app's Atlas tab and two screenshots of the
+   roomgraphs collection in Atlas itself (docs/post-images/app/07 and 08, cropped so the organisation name is not visible).
+   The MongoDB entry in "Prize Categories" is live. The Entire entry still needs the DevRelay embeds in "My Agent Session".
+   Stored documents include the source photo.
 8. Rules from the challenge page: submissions close 2026-10-18 11:59 PM PDT (2026-10-19 15:59 KST);
    non-English posts are not eligible for prizes; the page header also showed a "Live / Ended" status, so
    confirm the challenge is still open.
@@ -175,6 +177,18 @@ And the run that failed: `gemma4:e4b` on the busiest of my five rooms. Two `gen_
 ![The Sentry waterfall of the failed gemma4:e4b run: two gen_ai.chat spans of about two minutes each, two compiler.assemble spans and then compiler.fallback_preset](https://raw.githubusercontent.com/scs0209/reality-compiler/feat/real-gemma-sentry-tracing/docs/post-images/sentry/02-failed-run-waterfall.jpg)
 
 ![Sentry's Agents view listing six compiles of the same test set, with root duration, errors, LLM calls and total tokens, and the failed run marked with one error](https://raw.githubusercontent.com/scs0209/reality-compiler/feat/real-gemma-sentry-tracing/docs/post-images/sentry/01-agents-six-traces.jpg)
+
+And the saved-rooms list in the app, read back from the Atlas collection: the three sample rooms and the compiles stored there.
+
+![The app's MongoDB Atlas tab: a search box, an upsert button and the list of saved rooms with their scene ids and object counts](https://raw.githubusercontent.com/scs0209/reality-compiler/feat/real-gemma-sentry-tracing/docs/post-images/app/06-atlas-saved-rooms.jpg)
+
+And the collection in Atlas itself: 11 documents and 3 indexes (the default `_id`, a unique `sceneId` and the text index), with the three seeded sample rooms first.
+
+![The roomgraphs collection in MongoDB Atlas: database reality_compiler, 11 documents, 3 indexes, and the first two seeded sample rooms as documents](https://raw.githubusercontent.com/scs0209/reality-compiler/feat/real-gemma-sentry-tracing/docs/post-images/app/07-atlas-roomgraphs-collection.jpg)
+
+Opened on one stored compile, `compileMeta` holds the model that answered, its runtime and measured latency (46,634 ms) and the Sentry trace id, so a stored room can be matched to its trace. It is the same run as the first Sentry waterfall above.
+
+![One stored compile in Atlas with compileMeta expanded: model gemma3:4b, runtime ollama-gemma3:4b, latencyMs 46634 and the Sentry trace id](https://raw.githubusercontent.com/scs0209/reality-compiler/feat/real-gemma-sentry-tracing/docs/post-images/app/08-atlas-compiled-document.jpg)
 
 ## Why Does Open Innovation Matter?
 
@@ -326,6 +340,10 @@ identifies them.]
 
 **Best Use of Sentry Agent Tracing ($100).** Every compile is one `gen_ai.invoke_agent` trace: a span for the Ollama preflight, one `gen_ai.chat` span per Gemma request with the model name and Ollama's real input and output token counts, one for validation and one for the Atlas save. No prompt or photo is attached. The screenshots above are from real runs against a real Sentry project. A normal `gemma3:4b` compile is about 47 s with the model call 99.8% of it, and the `gemma4:e4b` run on the busiest room shows two attempts of about 2.2 minutes that each hit the 3.5k output-token limit before the app fell back to its sample room. The code is in `server/sentryAgentTracer.ts`.
 
+**Best Use of MongoDB Atlas ($100).** Atlas is the data layer behind the app. Every compile is saved as one document in the `roomgraphs` collection of a real Atlas cluster, keyed by a unique `sceneId`, and the saved-rooms list in the app is read back from it; the three sample rooms are seeded there too. A text index over titles and labels exists, but the app's search still filters in code, so I do not claim Atlas search. Documents include the source photo, so storing in Atlas is opt-in through `MONGODB_URI`; without it the header says "memory only". The code is in `server/atlasStore.ts`.
+
+**Best Use of Entire ($100).** Entire recorded the Claude Code sessions behind this build and linked them to commits: 14 of the repository's 15 commits carry an `Entire-Checkpoint:` trailer. The records are in a private repository. Seven moments of them are embedded under "My Agent Session", with my prompts translated into English.
+
 <!--
 READY-TO-ENABLE. Move a block above this comment only once its condition is true.
 Anything you cannot show in the post should stay out.
@@ -334,9 +352,7 @@ Anything you cannot show in the post should stay out.
 
 **Best Use of a .tech Domain ($100).** [Enable when the project is live on a .tech domain you claimed through Hacktoberfest. The challenge page asks for that; realitycompiler.tech appears in .do/app.yaml but is not verified.]
 
-**Best Use of MongoDB Atlas ($100).** [Enable when MONGODB_URI points at a real cluster and /api/health reports Atlas as connected. Code: server/atlasStore.ts, with a text index over titles and labels.]
 
-**Best Use of Entire ($100).** [Enable when you have shared a real agent session in this post under "My Agent Session".]
 
 **Best Use of GitHub Copilot ($100).** [Enable only if you actually built the project with Copilot's coding agent, CLI or app. The repo has .github/copilot-instructions.md and a CI workflow, but that is not the same thing.]
 -->

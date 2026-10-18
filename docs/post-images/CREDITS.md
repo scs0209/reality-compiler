@@ -13,7 +13,7 @@ credit; it is given anyway.
 
 `app/03-evidence-photo.jpg` is a screenshot of the app showing "Single dorm room, UVA.jpg" (above); the
 other screenshots in `app/` show only the app's own interface and a model-made 3D room. The images in
-`sentry/` are screenshots of Sentry's interface.
+`sentry/` are screenshots of Sentry's interface, and `app/06` to `app/08` show the app's Atlas tab and MongoDB Atlas's own interface.
 
 The text in the figure (the objects each model listed, times and counts) comes from runs of this
 project's own pipeline. A fifth test image, a bedroom photo of unknown licence, is not included.
