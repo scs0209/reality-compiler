@@ -19,14 +19,15 @@ Open items. The post does not claim anything that is still unverified:
 3. Real photos: five room images went through the app's pipeline with two models (see "Which Gemma?"). Four are
    CC0 files from Wikimedia Commons and are credited in the post. The fifth is a bedroom photo you downloaded
    (images.jpeg) whose source and licence I do not know: do not show it, or screenshots of its result, in the post
-   or the video. Use a photo you own or can license instead. Still to add: screenshots or a short video of real
-   runs under "Demo".
+   or the video. Use a photo you own or can license instead. The app screenshots in the post
+   (docs/post-images/app) come from the CC0 dorm-room photo. Still to add: a short video of a real run under "Demo".
 4. Prize categories: only Gemma is enabled. The READY-TO-ENABLE blocks at the bottom each say what must be true first.
 5. Agent session: none is shared yet. entire-session/devrelay-session.json is not an export from Entire or DevRelay
    and its content is out of date, so do not link it. Save this session with DevRelay and add "My Agent Session"
    with the real link or embed; the placeholder sits under "Why Does Open Innovation Matter?".
-6. Sentry: with a real SENTRY_DSN, Sentry accepted a compile's transaction (HTTP 200, no failures). Still open the
-   trace in Sentry itself (including its AI Agents view) and take the screenshots the Sentry category asks for.
+6. Sentry: done. Six real compiles were sent (HTTP 200, no failures) and three screenshots from Sentry's Agents view
+   and trace details are in the post (docs/post-images/sentry). The Sentry project also holds unrelated issues from
+   another app: do not screenshot its Issues feed or the project switcher.
 7. MongoDB Atlas: connected to a real cluster, and a compile was stored there. Take a screenshot of the collection
    for the post. Note that stored documents include the source photo.
 8. Rules from the challenge page: submissions close 2026-10-18 11:59 PM PDT (2026-10-19 15:59 KST);
@@ -46,6 +47,10 @@ Open items. The post does not claim anything that is still unverified:
 Reality Compiler turns **one photo of a room** into a **RoomGraph**: JSON that other tools can read, not a picture to look at.
 
 Most photo-to-room tools aim for a smooth 3D mesh. A mesh looks equally sure of itself everywhere, including behind the bed, where the camera saw nothing. If the next question is "will this sofa get through that door?", that false confidence is the expensive part.
+
+![The 3D view of a real compile: a dorm room with a bed, wardrobe, desk, chair and bedside table, solid volumes for observed objects and dashed ones for inferred objects, each with a plus-or-minus centimetre shell](https://raw.githubusercontent.com/scs0209/reality-compiler/feat/real-gemma-sentry-tracing/docs/post-images/app/01-3d-view.jpg)
+
+This is a real compile of a CC0 dorm-room photo ("Single dorm room, UVA.jpg" on Wikimedia Commons) with `gemma3:4b`, shown in the app's 3D view. Solid volumes are observed, dashed ones are inferred, and every object has its ±cm shell.
 
 So the output is data with its doubt attached:
 
@@ -72,6 +77,14 @@ One node of the output looks like this (trimmed; values are illustrative):
 }
 ```
 
+A real node from the dorm-room compile, as the app's JSON tab shows it:
+
+![One node of the real RoomGraph JSON: the bed with epistemic inferred, confidence 0.85, bbox2d null and its footprint](https://raw.githubusercontent.com/scs0209/reality-compiler/feat/real-gemma-sentry-tracing/docs/post-images/app/04-roomgraph-json.jpg)
+
+And the same bed in the inspector. Gemma had placed it outside the room, so the code moved it 20 cm inside, took it from observed to inferred and wrote the move into its reason. Its position is a guess, not a reading.
+
+![The scene inspector for the bed: inferred, 85 percent confidence, plus-or-minus 20 cm on position, and the reason that says the model placed it outside the room and it was moved 20 cm to fit inside](https://raw.githubusercontent.com/scs0209/reality-compiler/feat/real-gemma-sentry-tracing/docs/post-images/app/02-inspector-moved-bed.jpg)
+
 ### The side hustle
 
 The idea is for people who plan moves or furniture deliveries without visiting the room: a small moving crew pricing a studio from a customer's photo, or a tenant asking "does the 140 cm standing desk still fit if I rotate it?". I haven't put it in front of a real customer, so treat that as a hypothesis, not a result.
@@ -89,6 +102,16 @@ npm run dev
 Then open the Vite URL it prints (`http://127.0.0.1:5173` by default), upload a PNG, JPEG or WebP, set the reference object (a 210 cm door frame by default) and wait. On my Mac a compile takes 40 to 50 seconds, and 90 to 110 seconds when Gemma's first answer is rejected and it gets a second try.
 
 If Gemma can't produce a usable answer, the app does not pretend. It shows a bundled sample room under an amber banner that says it is **not your photo** and why, and it does not save that result automatically. The three rooms in the sidebar are hand-authored samples, labelled as such; loading one does not call a model.
+
+### What a compile gives you
+
+The source photo stays next to the result at its own aspect ratio. Compiled rooms get no object boxes, because `gemma3:4b` could not place them, and the panel says so instead of drawing guesses.
+
+![The source photo panel for the dorm-room compile, with a note that no object boxes are drawn because the vision model is not asked to locate objects](https://raw.githubusercontent.com/scs0209/reality-compiler/feat/real-gemma-sentry-tracing/docs/post-images/app/03-evidence-photo.jpg)
+
+The moving what-if check runs on the same graph. Here the nominal layout is blocked by a desk and chair that overlap by 10 cm, and the worst-case run adds the gaps that look fine but could be wrong: the desk and the bedside table touch at 0 cm, with a combined uncertainty of ±46 cm.
+
+![The what-if verifier: nominal geometry blocked by a collision, worst-case uncertainty collision, and a list of alerts such as OBJECT_COLLISION and UNCERTAINTY_OVERFLOW with a note to verify one gap with a tape measure](https://raw.githubusercontent.com/scs0209/reality-compiler/feat/real-gemma-sentry-tracing/docs/post-images/app/05-whatif-verifier.jpg)
 
 ## Code
 
@@ -142,6 +165,16 @@ The limits of this test: five images, one run each, no labelled ground truth, so
 
 **Optional integrations.** With `SENTRY_DSN` set, each compile is sent to Sentry as a `gen_ai.invoke_agent` trace: one span for the preflight check, one for each Gemma request (with Ollama's real input and output token counts), one for validation and one for the save. Photos, file names and prompt text are never attached. Without a DSN nothing is sent, and the header and `/api/health` say "not sending". With `MONGODB_URI` set, compiled RoomGraphs are stored in MongoDB Atlas; note that this includes the source photo, so it is an explicit opt-in.
 
+Here is a normal `gemma3:4b` compile in Sentry. The whole run is 46.67 s and the model call is 46.58 s of it, about 99.8%. The Ollama preflight takes 13 ms, validation 3 ms and the Atlas save 40 ms, so the model is the only thing worth optimising.
+
+![The Sentry waterfall of a gemma3:4b compile: gen_ai.invoke_agent of 46.67 seconds with a preflight, one gen_ai.chat span of 46.58 seconds, compiler.assemble and db.mongodb.upsert](https://raw.githubusercontent.com/scs0209/reality-compiler/feat/real-gemma-sentry-tracing/docs/post-images/sentry/04-gemma3-run-waterfall.jpg)
+
+And the run that failed: `gemma4:e4b` on the busiest of my five rooms. Two `gen_ai.chat` spans of 2.26 and 2.20 minutes each ended at the 3.5k output-token limit, both answers were cut off, and the app fell back to its sample room after 4.45 minutes. Sentry's Agents view lists it with one error, and nothing was saved to Atlas.
+
+![The Sentry waterfall of the failed gemma4:e4b run: two gen_ai.chat spans of about two minutes each, two compiler.assemble spans and then compiler.fallback_preset](https://raw.githubusercontent.com/scs0209/reality-compiler/feat/real-gemma-sentry-tracing/docs/post-images/sentry/02-failed-run-waterfall.jpg)
+
+![Sentry's Agents view listing six compiles of the same test set, with root duration, errors, LLM calls and total tokens, and the failed run marked with one error](https://raw.githubusercontent.com/scs0209/reality-compiler/feat/real-gemma-sentry-tracing/docs/post-images/sentry/01-agents-six-traces.jpg)
+
 ## Why Does Open Innovation Matter?
 
 - **Photos of your home are private.** With `gemma3:4b` running locally through Ollama, the photo stays on your machine. That changes if you point the app at a remote Ollama or turn on Atlas storage, and both are your choice.
@@ -176,6 +209,8 @@ identifies them.]
 
 **Best Use of Gemma ($200).** `gemma3:4b` runs locally through Ollama and is the only source of the objects, sizes and epistemic labels in a compiled RoomGraph. Its answer is requested with a JSON Schema, validated against the RoomGraph schema, retried once on failure, and replaced by a clearly labelled sample if it still fails. The code is in `server/gemmaCompiler.ts` and `server/gemmaScene.ts`.
 
+**Best Use of Sentry Agent Tracing ($100).** Every compile is one `gen_ai.invoke_agent` trace: a span for the Ollama preflight, one `gen_ai.chat` span per Gemma request with the model name and Ollama's real input and output token counts, one for validation and one for the Atlas save. No prompt or photo is attached. The screenshots above are from real runs against a real Sentry project. A normal `gemma3:4b` compile is about 47 s with the model call 99.8% of it, and the `gemma4:e4b` run on the busiest room shows two attempts of about 2.2 minutes that each hit the 3.5k output-token limit before the app fell back to its sample room. The code is in `server/sentryAgentTracer.ts`.
+
 <!--
 READY-TO-ENABLE. Move a block above this comment only once its condition is true.
 Anything you cannot show in the post should stay out.
@@ -185,8 +220,6 @@ Anything you cannot show in the post should stay out.
 **Best Use of a .tech Domain ($100).** [Enable when the project is live on a .tech domain you claimed through Hacktoberfest. The challenge page asks for that; realitycompiler.tech appears in .do/app.yaml but is not verified.]
 
 **Best Use of MongoDB Atlas ($100).** [Enable when MONGODB_URI points at a real cluster and /api/health reports Atlas as connected. Code: server/atlasStore.ts, with a text index over titles and labels.]
-
-**Best Use of Sentry Agent Tracing ($100).** [Enable when you have run compiles against a real Sentry project and put a trace screenshot in this post. Code: server/sentryAgentTracer.ts.]
 
 **Best Use of Entire ($100).** [Enable when you have shared a real agent session in this post under "My Agent Session".]
 
