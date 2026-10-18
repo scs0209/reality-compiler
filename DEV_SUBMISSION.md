@@ -24,8 +24,11 @@ Open items. The post does not claim anything that is still unverified:
 4. Prize categories: only Gemma is enabled. The READY-TO-ENABLE blocks at the bottom each say what must be true first.
 5. Agent session: none is shared yet. entire-session/devrelay-session.json is not an export from Entire or DevRelay
    and its content is out of date, so do not link it. "My Agent Session" is written (seven moments with my prompts in
-   English). Save the session with DevRelay, then replace each EMBED comment with the agent_session tag. The cut
-   files are in entire-moments/ (local only, not in git). Recount the Entire trailers in the first paragraph.
+   English). The seven cut files are in entire-moments/ (local only, not in git): they hold only the conversation
+   (prompts, replies, written reasoning), each with the Korean original and the English translation under it, and
+   no tool calls, tool output or local paths. Upload each file to DevRelay as its own session, then replace each bold
+   "[EMBED n of 7]" line with the agent_session tag and that session's id (one file per session, so no range is
+   needed). Recount the Entire trailers in the first paragraph.
 6. Sentry: done. Six real compiles were sent (HTTP 200, no failures) and three screenshots from Sentry's Agents view
    and trace details are in the post (docs/post-images/sentry). The Sentry project also holds unrelated issues from
    another app: do not screenshot its Issues feed or the project switcher.
@@ -43,7 +46,7 @@ Open items. The post does not claim anything that is still unverified:
    licence) to the repo or the post.
 -->
 
-*This is a submission for the [Hacktoberfest Open-Source AI Challenge: Week 2 (Side Hustle)](https://dev.to/challenges/hacktoberfest-week2-2026-10-12).*
+*This is a submission for the [Hacktoberfest Open-Source AI Challenge Week 2: Side Hustle](https://dev.to/challenges/hacktoberfest-week2-2026-10-12)*
 
 ## What I Built
 
@@ -93,6 +96,10 @@ And the same bed in the inspector. Gemma had placed it outside the room, so the 
 The idea is for people who plan moves or furniture deliveries without visiting the room: a small moving crew pricing a studio from a customer's photo, or a tenant asking "does the 140 cm standing desk still fit if I rotate it?". I haven't put it in front of a real customer, so treat that as a hypothesis, not a result.
 
 ## Demo
+
+![An 11-step walkthrough of one real compile: upload a dorm-room photo, gemma3:4b compiles it in 48 seconds, the RoomGraph appears as a 3D room, the inspector shows the bed as inferred and moved 20 cm into the room, the what-if verifier flags collisions, then the JSON, the Sentry trace and the MongoDB Atlas tab](https://raw.githubusercontent.com/scs0209/reality-compiler/feat/real-gemma-sentry-tracing/docs/post-images/app/demo.gif)
+
+The GIF is one real compile of a CC0 dorm-room photo with `gemma3:4b` on my Mac. It is stitched from screenshots taken during that run, not a continuous screen recording, and the 48 s wait is cut. The captions say what each step shows.
 
 It runs locally. You need Node 20 or newer and [Ollama](https://ollama.com).
 
@@ -205,8 +212,10 @@ local paths and e-mail address. Entire kept two session records for this build; 
 first and holds 42 of my prompts against 64 in the first.
 
 My prompts were in Korean. Each heading below is my English translation, and the Korean original is under
-it. I picked seven moments where something was decided or broke, including several where something was
-wrong and had to be undone.
+it. The embedded sessions show only the conversation: my prompts, the agent's replies and its written
+reasoning, each with the Korean original and my English translation under it. Tool calls and their output
+are left out. I picked seven moments where something was decided or broke, including several where
+something was wrong and had to be undone.
 
 ### 1. "Start with the real Gemma integration. Validate Ollama's structured output with RoomGraphSchema, say in the UI when it falls back, and remove the fake token and latency values."
 
@@ -222,7 +231,7 @@ is a hand-written formula and not a model.
 
 Commit: [2f22321](https://github.com/scs0209/reality-compiler/commit/2f22321) "Wire Gemma and Sentry for real; drop fabricated telemetry and TabPFN claims"
 
-<!-- EMBED 1 of 7: replace this comment with the agent_session tag for entire-moments/moment-1-real-gemma-and-sentry.jsonl (session id, then from..to) -->
+**[EMBED 1 of 7] Upload `entire-moments/moment-1-real-gemma-and-sentry.jsonl` to DevRelay and replace this whole line with the agent_session tag for that session.**
 
 ### 2. "[Pasted: RoomGraph JSON / Sentry trace / MongoDB Atlas (4) / Entire CLI session] And on the page, I see why RoomGraph JSON is needed, but is there a reason for the others? On the dashboard."
 
@@ -235,7 +244,7 @@ a domain I do not own, and "Entire CLI tracked"). Entire belongs in this section
 
 Commit: [416d025](https://github.com/scs0209/reality-compiler/commit/416d025) "Show the source photo at its own aspect ratio, say when there are no boxes, and drop the Entire tab"
 
-<!-- EMBED 2 of 7: replace this comment with the agent_session tag for entire-moments/moment-2-dashboard-tabs.jsonl (session id, then from..to) -->
+**[EMBED 2 of 7] Upload `entire-moments/moment-2-dashboard-tabs.jsonl` to DevRelay and replace this whole line with the agent_session tag for that session.**
 
 ### 3. "No, why is the floor plan in the corner of the photo?"
 
@@ -256,7 +265,7 @@ objects as inferred, shown as such). Add tests too."
 
 Commit: [b01a9f3](https://github.com/scs0209/reality-compiler/commit/b01a9f3) "Stop asking Gemma for photo boxes, keep objects inside the room, and survive long answers"
 
-<!-- EMBED 3 of 7: replace this comment with the agent_session tag for entire-moments/moment-3-boxes-in-the-corner.jsonl (session id, then from..to) -->
+**[EMBED 3 of 7] Upload `entire-moments/moment-3-boxes-in-the-corner.jsonl` to DevRelay and replace this whole line with the agent_session tag for that session.**
 
 ### 4. "Setting aside the photo being cropped, don't you feel the positions look odd in the picture with the floor plan?"
 
@@ -270,7 +279,7 @@ reason. The repair only stops impossible placements. It does not make a wrong po
 
 Commit: [b01a9f3](https://github.com/scs0209/reality-compiler/commit/b01a9f3) (same commit as moment 3)
 
-<!-- EMBED 4 of 7: replace this comment with the agent_session tag for entire-moments/moment-4-bed-outside-the-room.jsonl (session id, then from..to) -->
+**[EMBED 4 of 7] Upload `entire-moments/moment-4-bed-outside-the-room.jsonl` to DevRelay and replace this whole line with the agent_session tag for that session.**
 
 ### 5. "Fix the problem where gemma3:4b's first attempt is rejected because of the ceiling height (over 600). Don't reject the whole answer for an out-of-range ceilingHeightCm; correct it into range and use it, and record how many times that happens. Add tests, and re-measure first-attempt success and time on the same photos."
 
@@ -284,7 +293,7 @@ check back made the new tests fail with the same error.
 
 Commit: [c97f4f0](https://github.com/scs0209/reality-compiler/commit/c97f4f0) "Correct an out-of-range ceiling height instead of rejecting the whole answer"
 
-<!-- EMBED 5 of 7: replace this comment with the agent_session tag for entire-moments/moment-5-ceiling-height.jsonl (session id, then from..to) -->
+**[EMBED 5 of 7] Upload `entire-moments/moment-5-ceiling-height.jsonl` to DevRelay and replace this whole line with the agent_session tag for that session.**
 
 ### 6. "First push with --no-verify and check that origin has 0 entire refs. Then I allow the gemma4:e4b download (about 6.6 GB). Compare it with gemma3:4b on 3 to 5 photos and report the number of objects outside the room, the time, and the object recognition."
 
@@ -298,7 +307,7 @@ cannot show: five images, one run each, my own judgement of what was right.
 
 Commit: [bd3dbb5](https://github.com/scs0209/reality-compiler/commit/bd3dbb5) "Add the model comparison, photo credits and agent-session slots to the DEV draft"
 
-<!-- EMBED 6 of 7: replace this comment with the agent_session tag for entire-moments/moment-6-gemma3-vs-gemma4.jsonl (session id, then from..to) -->
+**[EMBED 6 of 7] Upload `entire-moments/moment-6-gemma3-vs-gemma4.jsonl` to DevRelay and replace this whole line with the agent_session tag for that session.**
 
 ### 7. "No, I'm saying the image has to be visible, not a path! How did you write the post?" and "Shouldn't our project's images be visible?"
 
@@ -315,7 +324,7 @@ broken on DEV.
 
 Commit: [d1ed312](https://github.com/scs0209/reality-compiler/commit/d1ed312) "Show the app itself in the DEV draft: screenshots of a real compile and of Sentry"
 
-<!-- EMBED 7 of 7: replace this comment with the agent_session tag for entire-moments/moment-7-show-the-project.jsonl (session id, then from..to) -->
+**[EMBED 7 of 7] Upload `entire-moments/moment-7-show-the-project.jsonl` to DevRelay and replace this whole line with the agent_session tag for that session.**
 
 <!--
 TEMPLATE POSITION. The challenge template puts "My First User" right after "My Agent Session", then "Prize Categories".
@@ -342,7 +351,7 @@ identifies them.]
 
 **Best Use of MongoDB Atlas ($100).** Atlas is the data layer behind the app. Every compile is saved as one document in the `roomgraphs` collection of a real Atlas cluster, keyed by a unique `sceneId`, and the saved-rooms list in the app is read back from it; the three sample rooms are seeded there too. A text index over titles and labels exists, but the app's search still filters in code, so I do not claim Atlas search. Documents include the source photo, so storing in Atlas is opt-in through `MONGODB_URI`; without it the header says "memory only". The code is in `server/atlasStore.ts`.
 
-**Best Use of Entire ($100).** Entire recorded the Claude Code sessions behind this build and linked them to commits: 14 of the repository's 15 commits carry an `Entire-Checkpoint:` trailer. The records are in a private repository. Seven moments of them are embedded under "My Agent Session", with my prompts translated into English.
+**Best Use of Entire ($100).** Entire recorded the Claude Code sessions behind this build and linked them to commits: 14 of the repository's 15 commits carry an `Entire-Checkpoint:` trailer. The records are in a private repository. Seven moments of them are embedded under "My Agent Session", with the dialogue translated into English.
 
 <!--
 READY-TO-ENABLE. Move a block above this comment only once its condition is true.
