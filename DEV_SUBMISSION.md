@@ -1,6 +1,7 @@
 ---
 title: "Reality Compiler: Gemma 3 Turns a Room Photo into Data You Can Check, Including What It Can't See"
 published: false
+cover_image: https://raw.githubusercontent.com/scs0209/reality-compiler/feat/real-gemma-sentry-tracing/docs/post-images/cover.png
 tags: devchallenge, hf26challenge, ai, opensource
 ---
 

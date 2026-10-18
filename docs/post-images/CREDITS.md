@@ -11,6 +11,9 @@ credit; it is given anyway.
 | The living room that needs houseplants.jpg | Lo | https://commons.wikimedia.org/wiki/File:The_living_room_that_needs_houseplants.jpg |
 | Living Room Interior Designer - Picker Online.jpg | From Pixabay; a 3D-rendered interior, not a photograph | https://commons.wikimedia.org/wiki/File:Living_Room_Interior_Designer_-_Picker_Online.jpg |
 
+`cover.png` is the post's cover image (2000×840). The small photo in it is "Single dorm room, UVA.jpg"
+(above, CC0); the large panel is a screenshot of this app's 3D view of the room compiled from that photo.
+
 `app/03-evidence-photo.jpg` is a screenshot of the app showing "Single dorm room, UVA.jpg" (above); the
 other screenshots in `app/` show only the app's own interface and a model-made 3D room. The images in
 `sentry/` are screenshots of Sentry's interface, and `app/06` to `app/08` show the app's Atlas tab and MongoDB Atlas's own interface.
