@@ -23,8 +23,9 @@ Open items. The post does not claim anything that is still unverified:
    (docs/post-images/app) come from the CC0 dorm-room photo. Still to add: a short video of a real run under "Demo".
 4. Prize categories: only Gemma is enabled. The READY-TO-ENABLE blocks at the bottom each say what must be true first.
 5. Agent session: none is shared yet. entire-session/devrelay-session.json is not an export from Entire or DevRelay
-   and its content is out of date, so do not link it. Save this session with DevRelay and add "My Agent Session"
-   with the real link or embed; the placeholder sits under "Why Does Open Innovation Matter?".
+   and its content is out of date, so do not link it. "My Agent Session" is written (seven moments with my prompts in
+   English). Save the session with DevRelay, then replace each EMBED comment with the agent_session tag. The cut
+   files are in entire-moments/ (local only, not in git). Recount the Entire trailers in the first paragraph.
 6. Sentry: done. Six real compiles were sent (HTTP 200, no failures) and three screenshots from Sentry's Agents view
    and trace details are in the post (docs/post-images/sentry). The Sentry project also holds unrelated issues from
    another app: do not screenshot its Issues feed or the project switcher.
@@ -182,15 +183,129 @@ And the run that failed: `gemma4:e4b` on the busiest of my five rooms. Two `gen_
 - **The trade-off is speed.** There is no per-photo API bill, but a compile takes 40 to 50 seconds on my Mac. That suits "check before moving day", not interactive editing.
 - **Be precise about "open".** Gemma 3 is open-weight under Google's own terms, not open source in the OSI sense; the Gemma 4 build I tried ships with an Apache 2.0 licence file. The model name is a config value (`GEMMA_MODEL`). I compared `gemma3:4b` and `gemma4:e4b` on five images (see "Which Gemma?"), and the default and the demo use `gemma3:4b`.
 
-<!--
-TEMPLATE POSITION. The challenge template puts "My Agent Session" right here, after "Why Does Open Innovation
-Matter?", then "My First User", then "Prize Categories". Move a block out of this comment only when it is real.
-
 ## My Agent Session
 
-[A link to, or an embed of, the session saved with DevRelay (devrelay.com). Say what to look at: the run where the
-photo boxes were measured and dropped, the placement fix, the ceiling-height fix, the model comparison. Check the
-transcript for personal data first: local paths, e-mail addresses, the Atlas cluster host name.]
+I built this with Claude Code, and [Entire](https://entire.io) recorded the sessions and linked them to
+commits: 14 of the repository's 15 commits carry an `Entire-Checkpoint:` trailer. The records are in a private repository because they also contain my
+local paths and e-mail address. Entire kept two session records for this build; the second overlaps the
+first and holds 42 of my prompts against 64 in the first.
+
+My prompts were in Korean. Each heading below is my English translation, and the Korean original is under
+it. I picked seven moments where something was decided or broke, including several where something was
+wrong and had to be undone.
+
+### 1. "Start with the real Gemma integration. Validate Ollama's structured output with RoomGraphSchema, say in the UI when it falls back, and remove the fake token and latency values."
+
+> Gemma 실제 연동부터 시작해줘. Ollama 구조화 출력을 RoomGraphSchema로 검증해서 쓰고, 실패하면 폴백임을 UI에 명시해줘. 가짜 토큰·지연 값도 제거해줘. gemma3:4b 다운로드(ollama pull)는 허락해.
+
+An earlier prototype of this project returned canned data with made-up token counts when the model was not
+reachable. The agent replaced it with a real Ollama call that asks for JSON Schema output, validates the
+answer against the RoomGraph schema, retries once with the validation error, and otherwise shows a
+bundled sample room under a banner that says it is not your photo. Tokens now come from Ollama and durations
+are measured. My next prompt asked for the same honesty from Sentry: real `gen_ai` spans, a real trace id,
+and a header that says "not sending" when there is no DSN. The TabPFN labels went too, because the moving quote
+is a hand-written formula and not a model.
+
+Commit: [2f22321](https://github.com/scs0209/reality-compiler/commit/2f22321) "Wire Gemma and Sentry for real; drop fabricated telemetry and TabPFN claims"
+
+<!-- EMBED 1 of 7: replace this comment with the agent_session tag for entire-moments/moment-1-real-gemma-and-sentry.jsonl (session id, then from..to) -->
+
+### 2. "[Pasted: RoomGraph JSON / Sentry trace / MongoDB Atlas (4) / Entire CLI session] And on the page, I see why RoomGraph JSON is needed, but is there a reason for the others? On the dashboard."
+
+> [붙여넣음: RoomGraph JSON / Sentry 트레이스 / MongoDB Atlas (4) / Entire CLI 세션] 그리고 페이지에서 RoomGraph JSON은 필요한거 알겠는데 나머지가 필요한 이유가 있어? 대시보드에서
+
+The Sentry and Atlas tabs show real data from the compile, so they stayed. The Entire tab did not: it was
+hand-written text with no connection to Entire, and it said the CLI was "active" while reading nothing from it.
+It came out of the app, together with three toolbar chips that were always shown on wide screens (DigitalOcean,
+a domain I do not own, and "Entire CLI tracked"). Entire belongs in this section of the post, not in the interface.
+
+Commit: [416d025](https://github.com/scs0209/reality-compiler/commit/416d025) "Show the source photo at its own aspect ratio, say when there are no boxes, and drop the Entire tab"
+
+<!-- EMBED 2 of 7: replace this comment with the agent_session tag for entire-moments/moment-2-dashboard-tabs.jsonl (session id, then from..to) -->
+
+### 3. "No, why is the floor plan in the corner of the photo?"
+
+> 아니 도면도가 왜 사진 구석탱이에 있어?
+
+The agent read "floor plan" as the object boxes drawn over the photo, which sat in its top-left corner, and my
+next prompt went along with that. Before touching any code it asked Gemma for one object's box in three
+coordinate conventions and drew the answers on the photo; none was accurate. It then ran the full request
+again with pixel coordinates: the boxes spread out but landed on the wrong objects (the bed's box over the
+window, a chair's box over a shelf). So the display was faithful and the model could not point at objects.
+I chose the option that stops asking:
+
+> A로 진행해줘. 모델에게 bbox를 요청하지 말고 컴파일 결과의 bbox2d는 null로 두어서 오버레이·크롭이 사진에서 빠지게 해줘. 방 밖으로 나간 물체를 방 안으로 보정하는 것도 같이 해줘(보정된 물체는 inferred로 내리고 표시). 테스트도 추가해줘.
+
+Translation: "Go with A. Don't ask the model for bboxes; leave bbox2d null in the compile result so the overlay and
+the crop drop out of the photo. Also correct objects that went outside the room back inside (mark corrected
+objects as inferred, shown as such). Add tests too."
+
+Commit: [b01a9f3](https://github.com/scs0209/reality-compiler/commit/b01a9f3) "Stop asking Gemma for photo boxes, keep objects inside the room, and survive long answers"
+
+<!-- EMBED 3 of 7: replace this comment with the agent_session tag for entire-moments/moment-3-boxes-in-the-corner.jsonl (session id, then from..to) -->
+
+### 4. "Setting aside the photo being cropped, don't you feel the positions look odd in the picture with the floor plan?"
+
+> 사진이 잘리는거랑 상관없이 도면이 있는 사진에 위치가 이상하다고 느끼지 않니?
+
+The agent had just fixed the cropped photo panel and was explaining the box coordinates. I asked about the
+layout itself, and it measured instead of agreeing: in my run 4 of 11 objects were outside the room the model had just described, and in two runs the
+model put a bed starting 300 cm from the west wall of a 360 cm room, 220 to 240 cm outside it. That became
+the repair step: move the object back inside, mark it inferred, widen its band and write the move into its
+reason. The repair only stops impossible placements. It does not make a wrong position right.
+
+Commit: [b01a9f3](https://github.com/scs0209/reality-compiler/commit/b01a9f3) (same commit as moment 3)
+
+<!-- EMBED 4 of 7: replace this comment with the agent_session tag for entire-moments/moment-4-bed-outside-the-room.jsonl (session id, then from..to) -->
+
+### 5. "Fix the problem where gemma3:4b's first attempt is rejected because of the ceiling height (over 600). Don't reject the whole answer for an out-of-range ceilingHeightCm; correct it into range and use it, and record how many times that happens. Add tests, and re-measure first-attempt success and time on the same photos."
+
+> gemma3:4b 첫 시도가 천장 높이(600 초과) 때문에 거부되는 문제를 고쳐줘. 범위를 벗어난 ceilingHeightCm은 답 전체를 거부하지 말고 범위 안으로 보정해서 쓰고 그 횟수를 기록해줘. 테스트도 추가하고, 같은 사진 p0, p1로 첫 시도 성공과 시간을 다시 재줘.
+
+The agent first printed what the model really wrote: 2700 and 2400, which are millimetres. Clamping to 600
+would have turned a 270 cm ceiling into a 600 cm one, so a value from 1800 to 6000 is read as millimetres and
+anything else out of range is clamped. Each correction is counted on the trace. The two test photos went from
+107.8 s and 90.6 s (a second attempt each) to 46.2 s and 40.0 s on the first attempt. Putting the old range
+check back made the new tests fail with the same error.
+
+Commit: [c97f4f0](https://github.com/scs0209/reality-compiler/commit/c97f4f0) "Correct an out-of-range ceiling height instead of rejecting the whole answer"
+
+<!-- EMBED 5 of 7: replace this comment with the agent_session tag for entire-moments/moment-5-ceiling-height.jsonl (session id, then from..to) -->
+
+### 6. "First push with --no-verify and check that origin has 0 entire refs. Then I allow the gemma4:e4b download (about 6.6 GB). Compare it with gemma3:4b on 3 to 5 photos and report the number of objects outside the room, the time, and the object recognition."
+
+> 먼저 --no-verify로 푸시하고 origin의 entire 참조 0개를 확인해줘. 그다음 gemma4:e4b(약 6.6GB) 다운로드를 허락할게. 사진 3~5장으로 gemma3:4b와 비교해서 방 밖 물체 수, 소요 시간, 객체 인식을 보고해줘.
+
+I had one real photo, so the agent found four CC0 room images on Wikimedia Commons and asked before
+downloading them. One earlier candidate turned out to be a portrait and not a room, and it was deleted unused.
+On five images Gemma 4 E4B put fewer objects outside the room (2 of 20 against 4 of 28), but it was about
+2.4 times slower and failed on the busiest room, so `gemma3:4b` stays the default. The post says what the test
+cannot show: five images, one run each, my own judgement of what was right.
+
+Commit: [bd3dbb5](https://github.com/scs0209/reality-compiler/commit/bd3dbb5) "Add the model comparison, photo credits and agent-session slots to the DEV draft"
+
+<!-- EMBED 6 of 7: replace this comment with the agent_session tag for entire-moments/moment-6-gemma3-vs-gemma4.jsonl (session id, then from..to) -->
+
+### 7. "No, I'm saying the image has to be visible, not a path! How did you write the post?" and "Shouldn't our project's images be visible?"
+
+> 아니 경로를 넣는게 아니라 이미지가 보여야된다니까? 너 글을 어떻게 작성한거야
+>
+> 우리 프로젝트 이미지가 보여야되는거 아님?
+
+Two mistakes of the agent's. The post linked its comparison figure through a `raw.githubusercontent.com` address
+that returned 404 until the file was pushed, and the post had no picture of the app itself, only a figure of
+other people's photos. The agent pushed (hooks skipped, so no Entire checkpoint reached the public
+repository), opened every image address to check it, and added five screenshots of a real compile plus the
+Sentry captures. It had offered a relative path first, which would have looked right in a preview and
+broken on DEV.
+
+Commit: [d1ed312](https://github.com/scs0209/reality-compiler/commit/d1ed312) "Show the app itself in the DEV draft: screenshots of a real compile and of Sentry"
+
+<!-- EMBED 7 of 7: replace this comment with the agent_session tag for entire-moments/moment-7-show-the-project.jsonl (session id, then from..to) -->
+
+<!--
+TEMPLATE POSITION. The challenge template puts "My First User" right after "My Agent Session", then "Prize Categories".
+Move this block out of the comment only when it is real.
 
 ## My First User
 
